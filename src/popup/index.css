@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+	/* Spacing */
+	--spacing-ur-xs: var(--ur-space-xs);
+	--spacing-ur-sm: var(--ur-space-sm);
+	--spacing-ur-md: var(--ur-space-md);
+	--spacing-ur-lg: var(--ur-space-lg);
+	--spacing-ur-xl: var(--ur-space-xl);
+	--spacing-ur-2xl: var(--ur-space-2xl);
+	--spacing-ur-3xl: var(--ur-space-3xl);
+
+	/* Colors */
+	--color-ur-white: var(--ur-color-white);
+	--color-ur-black: var(--ur-color-black);
+	--color-ur-blue-electric: var(--ur-color-blue-electric);
+	--color-ur-blue-light: var(--ur-color-blue-light);
+	--color-ur-blue-navy: var(--ur-color-blue-navy);
+	--color-ur-green: var(--ur-color-green);
+	--color-ur-pink: var(--ur-color-pink);
+	--color-ur-coral: var(--ur-color-coral);
+	--color-ur-yellow-light: var(--ur-color-yellow-light);
+	--color-ur-maroon: var(--ur-color-maroon);
+	--color-ur-gray: var(--ur-color-gray);
+	--color-ur-gray-dark: var(--ur-color-gray-dark);
+}
+
+:root {
+	font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+	line-height: 1.5;
+	font-weight: 400;
+
+	color-scheme: light dark;
+	color: rgba(255, 255, 255, 0.87);
+	background-color: #242424;
+
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+a {
+	font-weight: 500;
+	color: #646cff;
+	text-decoration: inherit;
+}
+a:hover {
+	color: #535bf2;
+}
+
+body {
+	margin: 0;
+	display: flex;
+	place-items: center;
+	min-width: 400px;
+	max-width: 400px;
+	min-height: 100vh;
+	background-color: var(--ur-color-black);
+}
+
+h1 {
+	font-size: 3.2em;
+	line-height: 1.1;
+}
+
+button {
+	border-radius: 8px;
+	border: 1px solid transparent;
+	padding: 0.6em 1.2em;
+	font-size: 1em;
+	font-weight: 500;
+	font-family: inherit;
+	background-color: #1a1a1a;
+	cursor: pointer;
+	transition: border-color 0.25s;
+}
+button:hover {
+	border-color: #646cff;
+}
+button:focus,
+button:focus-visible {
+	outline: 4px auto -webkit-focus-ring-color;
+}
+
+.card {
+	padding: 2em;
+}
+
+#app {
+	max-width: 1280px;
+	margin: 0 auto;
+	padding: 2rem;
+	text-align: center;
+}
+
+@media (prefers-color-scheme: light) {
+	:root {
+		color: #213547;
+		background-color: #ffffff;
+	}
+	a:hover {
+		color: #747bff;
+	}
+	button {
+		background-color: #f9f9f9;
+	}
+}
