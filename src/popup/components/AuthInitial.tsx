@@ -5,6 +5,7 @@ import { getMessage } from "@/utils/i18n";
 import { useLogin } from "@urnetwork/sdk-js/react";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { Screen } from "./Screen";
 
 const AuthInitial: React.FC = () => {
 	const navigate = useNavigate();
@@ -13,9 +14,10 @@ const AuthInitial: React.FC = () => {
 
 	const handleLogin = async () => {
 		try {
-			const result = await login({ userAuth });
+			const result = await login({ user_auth: userAuth });
 			console.log("login result is: ", result);
-			if (result.authAllowed && result.authAllowed.includes("password")) {
+			if (result.auth_allowed && result.auth_allowed.includes("password")) {
+				console.log("navigate to userauth pass login");
 				navigate("/login-user-auth");
 			} else {
 				console.log("result without authAllowed password is: ", result);
@@ -26,7 +28,7 @@ const AuthInitial: React.FC = () => {
 	};
 
 	return (
-		<div className="min-h-screen flex flex-col items-center justify-center w-full">
+		<Screen>
 			<UrText variant="header">
 				{getMessage("stay_completely_private_and_anonymous")}
 			</UrText>
@@ -47,7 +49,7 @@ const AuthInitial: React.FC = () => {
 			</UrButton>
 
 			{error && <UrText variant="body">{error.message}</UrText>}
-		</div>
+		</Screen>
 	);
 };
 

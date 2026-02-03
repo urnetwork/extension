@@ -2,7 +2,7 @@ import { Routes } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { Route } from "react-router-dom";
 import AuthInitial from "./AuthInitial";
-import { Connect } from "./Connect";
+import { ConnectScreen } from "./ConnectScreen";
 import AuthCreateNetwork from "./AuthCreateNetwork";
 import AuthLoginUserAuth from "./AuthLoginUserAuth";
 import AuthForgotPassword from "./AuthForgotPassword";
@@ -23,7 +23,7 @@ const AuthRoutes: React.FC = () => {
 const MainRoutes: React.FC = () => {
 	return (
 		<Routes>
-			<Route path="/" element={<Connect />} />
+			<Route path="/" element={<ConnectScreen />} />
 		</Routes>
 	);
 };
