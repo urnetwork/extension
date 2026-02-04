@@ -25,3 +25,6 @@ dist-ssr
 
 # ignore locales output
 public/_locales/
+
+# release builds
+release/

@@ -25,7 +25,10 @@ export default defineConfig({
 				},
 			],
 		}),
-		zip({ outDir: "release", outFileName: `crx-${name}-${version}.zip` }),
+		zip({
+			outDir: "release",
+			outFileName: `crx-${name.replace("/", "-")}-${version}.zip`,
+		}),
 		tailwindcss(),
 	],
 	server: {

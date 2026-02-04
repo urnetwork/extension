@@ -6,19 +6,17 @@ import {
 	UrBackButton,
 } from "@urnetwork/elements/react";
 import React, { useState } from "react";
-import { useAuth } from "../hooks/useAuth";
 import { Screen } from "./Screen";
 import { useNavigate } from "react-router-dom";
-import { useLoginWithPassword } from "@urnetwork/sdk-js/react";
+import { useAuthFlow } from "@urnetwork/sdk-js/react";
 
 const AuthLoginUserAuth: React.FC = () => {
-	const { userAuth } = useAuth();
 	const [password, setPassword] = useState("");
 	const navigate = useNavigate();
-	const { login, loading, error } = useLoginWithPassword();
+	const { state, loginWithPassword } = useAuthFlow();
 
 	const handleLogin = async () => {
-		const result = await login({ user_auth: userAuth, password });
+		const result = await loginWithPassword({ password });
 		console.log("login with password result is: ", result);
 		// todo - navigate to connect on success
 		// todo - prompt error message if failed
@@ -36,7 +34,7 @@ const AuthLoginUserAuth: React.FC = () => {
 
 			<UrInput
 				label={getMessage("user_auth_input_label")}
-				value={userAuth}
+				value={state.userAuth}
 				className="mb-ur-md"
 				readonly
 			/>
@@ -54,18 +52,18 @@ const AuthLoginUserAuth: React.FC = () => {
 				fullWidth
 				onClick={handleLogin}
 				className="mb-ur-lg"
-				loading={loading}
+				loading={state.loading.loggingInWithPassword}
 			>
 				{getMessage("continue")}
 			</UrButton>
 
-			{error && (
+			{state.errors.passwordLogin && (
 				<UrText
 					variant="body"
 					color="var(--ur-color-danger)"
 					className="mb-ur-lg"
 				>
-					{error.message}
+					{state.errors.passwordLogin}
 				</UrText>
 			)}
 
