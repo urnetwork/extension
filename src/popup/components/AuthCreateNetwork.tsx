@@ -56,30 +56,11 @@ const AuthCreateNetwork: React.FC = () => {
 			return;
 		}
 
-		// todo - navigate to verify if userAuth, enter app if SSO or wallet
+		if (result.network?.by_jwt) {
+			// todo - auth and enter app
+		}
 	};
 
-	// const validate = () => {
-	// 	let isValid = true;
-	// 	if (password.length < 12) {
-	// 		isValid = false;
-	// 	}
-
-	// 	if (!termsAgreed) {
-	// 		isValid = false;
-	// 	}
-
-	// 	if (!checkNetworkResult) {
-	// 		isValid = false;
-	// 	}
-
-	// 	if (checkNetworkResult && !checkNetworkResult.available) {
-	// 		isValid = false;
-	// 	}
-
-	// 	setFormValid(isValid);
-	// };
-	//
 	const isNetworkNameInvalid = () => {
 		return (
 			(checkNetworkResult && !checkNetworkResult.available) ||
