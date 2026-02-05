@@ -1,8 +1,9 @@
 import { MemoryRouter } from "react-router-dom";
 import "./App.css";
-import { AuthContextProvider } from "./context/AuthContextProvider";
+// import { AuthContextProvider } from "./context/AuthContextProvider";
 import { AppRoutes } from "./components/AppRoutes";
-import { URNetworkAPIProvider } from "@urnetwork/sdk-js/react";
+import { chromeStorageAdapter } from "../utils/storage-adapter";
+import { AuthProvider, URNetworkAPIProvider } from "@urnetwork/sdk-js/react";
 
 export default function App() {
 	// const wasmUrl = chrome.runtime.getURL("wasm/sdk.wasm");
@@ -11,9 +12,9 @@ export default function App() {
 	return (
 		<MemoryRouter>
 			<URNetworkAPIProvider>
-				<AuthContextProvider>
+				<AuthProvider storage={chromeStorageAdapter} onAuthChange={() => null}>
 					<AppRoutes />
-				</AuthContextProvider>
+				</AuthProvider>
 			</URNetworkAPIProvider>
 		</MemoryRouter>
 	);
