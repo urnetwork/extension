@@ -6,7 +6,7 @@ import AuthCreateNetwork from "./AuthCreateNetwork";
 import AuthLoginUserAuth from "./AuthLoginUserAuth";
 import AuthForgotPassword from "./AuthForgotPassword";
 import AuthVerify from "./AuthVerify";
-import { AuthFlowProvider } from "@urnetwork/sdk-js/react";
+import { AuthFlowProvider, useAuth } from "@urnetwork/sdk-js/react";
 
 const AuthRoutes: React.FC = () => {
 	return (
@@ -31,10 +31,7 @@ const MainRoutes: React.FC = () => {
 };
 
 export const AppRoutes: React.FC = () => {
-	// const { token } = useAuth();
+	const { isAuthenticated } = useAuth();
 
-	// for testing
-	const token = null;
-
-	return token ? <MainRoutes /> : <AuthRoutes />;
+	return isAuthenticated ? <MainRoutes /> : <AuthRoutes />;
 };
