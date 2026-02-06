@@ -22,6 +22,10 @@ export default defineManifest({
 	//   },
 	// ],
 	// permissions: ["sidePanel", "contentSettings"],
+	background: {
+		service_worker: "src/background/index.ts",
+		type: "module",
+	},
 	permissions: ["contentSettings", "proxy", "storage"],
 	//
 	host_permissions: ["<all_urls>"],
@@ -31,6 +35,13 @@ export default defineManifest({
 			matches: ["<all_urls>"],
 		},
 	],
+	externally_connectable: {
+		matches: [
+			"https://localhost:*/*",
+			"https://ur.io/*",
+			"https://app.ur.network/*",
+		],
+	},
 	// side_panel: {
 	//   default_path: "src/sidepanel/index.html",
 	// },
