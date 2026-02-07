@@ -104,43 +104,45 @@ const AuthInitial: React.FC = () => {
 
 	return (
 		<Screen>
-			<UrText variant="header" className="mt-ur-lg">
-				{getMessage("stay_completely_private_and_anonymous")}
-			</UrText>
+			<div className="p-ur-md">
+				<UrText variant="header" className="mt-ur-lg">
+					{getMessage("stay_completely_private_and_anonymous")}
+				</UrText>
 
-			<UrText variant="subheader" className="mb-ur-2xl">
-				with URnetwork
-			</UrText>
+				<UrText variant="subheader" className="mb-ur-2xl">
+					with URnetwork
+				</UrText>
 
-			<form onSubmit={handleLogin}>
-				<UrInput
-					label={getMessage("auth_code_input_label")}
-					placeholder={getMessage("auth_code_input_placeholder")}
-					className="mb-ur-lg"
-					value={authCode}
-					onInput={(e) => setAuthCode(e.detail.value)}
-					invalid={!!error}
-					hint={error ? getMessage("auth_code_input_invalid") : undefined}
-				/>
+				<form onSubmit={handleLogin}>
+					<UrInput
+						label={getMessage("auth_code_input_label")}
+						placeholder={getMessage("auth_code_input_placeholder")}
+						className="mb-ur-lg"
+						value={authCode}
+						onInput={(e) => setAuthCode(e.detail.value)}
+						invalid={!!error}
+						hint={error ? getMessage("auth_code_input_invalid") : undefined}
+					/>
 
-				<UrButton
-					buttonType="submit"
-					onClick={handleLogin}
-					loading={loading}
-					fullWidth
-					className="mb-ur-lg"
-				>
-					{getMessage("launch")}
-				</UrButton>
-			</form>
+					<UrButton
+						buttonType="submit"
+						onClick={handleLogin}
+						loading={loading}
+						fullWidth
+						className="mb-ur-lg"
+					>
+						{getMessage("launch")}
+					</UrButton>
+				</form>
 
-			<UrText>
-				{renderInstructionsWithLink(
-					getMessage("access_auth_code_instructions"),
-				)}
-			</UrText>
+				<UrText>
+					{renderInstructionsWithLink(
+						getMessage("access_auth_code_instructions"),
+					)}
+				</UrText>
 
-			{error && <UrText variant="body">{error.message}</UrText>}
+				{error && <UrText variant="body">{error.message}</UrText>}
+			</div>
 		</Screen>
 	);
 };
