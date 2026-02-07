@@ -1,3 +1,10 @@
+import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
+
+// Restore proxy state when extension starts
+proxyManager.restoreState().then(() => {
+	console.log("Proxy state restored");
+});
+
 // Listen for messages from the website
 chrome.runtime.onMessageExternal.addListener(
 	(message, sender, sendResponse) => {
@@ -48,5 +55,46 @@ chrome.runtime.onMessageExternal.addListener(
 		return false;
 	},
 );
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+	console.log("Received internal message:", message);
+
+	// Handle VPN enable request
+	if (message.type === "ENABLE_VPN" && message.config) {
+		proxyManager
+			.enable(message.config as ProxyConfig)
+			.then(() => {
+				sendResponse({ success: true });
+			})
+			.catch((error) => {
+				console.error("Failed to enable VPN:", error);
+				sendResponse({ success: false, error: error.message });
+			});
+		return true; // Keep message channel open for async response
+	}
+
+	// Handle VPN disable request
+	if (message.type === "DISABLE_VPN") {
+		proxyManager
+			.disable()
+			.then(() => {
+				sendResponse({ success: true });
+			})
+			.catch((error) => {
+				console.error("Failed to disable VPN:", error);
+				sendResponse({ success: false, error: error.message });
+			});
+		return true;
+	}
+
+	// Handle VPN state request
+	if (message.type === "GET_VPN_STATE") {
+		const state = proxyManager.getState();
+		sendResponse({ success: true, state });
+		return true;
+	}
+
+	return false;
+});
 
 console.log("URnetwork extension background script loaded");
