@@ -16,7 +16,7 @@
 		"@tailwindcss/vite": "^4.1.18",
 		"@urnetwork/elements": "^0.0.1-beta.1",
 		"@urnetwork/localizations": "^0.0.1",
-		"@urnetwork/sdk-js": "file:../sdk/sdk-js",
+		"@urnetwork/sdk-js": "^0.0.1-beta.1",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
 		"react-router-dom": "^7.13.0",
