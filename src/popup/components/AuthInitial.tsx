@@ -122,6 +122,7 @@ const AuthInitial: React.FC = () => {
 						onInput={(e) => setAuthCode(e.detail.value)}
 						invalid={!!error}
 						hint={error ? getMessage("auth_code_input_invalid") : undefined}
+						type="password"
 					/>
 
 					<UrButton
