@@ -2,21 +2,14 @@ import React, { useEffect } from "react";
 
 import { UrButton, UrInput, UrText } from "@urnetwork/elements/react";
 import { getMessage } from "@/utils/i18n";
-import {
-	useAuth,
-	useAuthCodeLogin,
-	// useAuthFlow,
-} from "@urnetwork/sdk-js/react";
-// import { useNavigate } from "react-router-dom";
+import { useAuth, useAuthCodeLogin } from "@urnetwork/sdk-js/react";
 import { Screen } from "./Screen";
 
 const AuthInitial: React.FC = () => {
-	// const navigate = useNavigate();
 	const [authCode, setAuthCode] = React.useState("");
 	const { setAuth } = useAuth();
 
 	const { authCodeLogin, loading, error } = useAuthCodeLogin();
-	// const { state, checkUserAuth } = useAuthFlow();
 	interface JWTReceivedMessage {
 		type: "JWT_RECEIVED";
 		jwt: string;
@@ -42,11 +35,8 @@ const AuthInitial: React.FC = () => {
 	const handleLogin = async (e?: React.FormEvent | Event) => {
 		if (e) e.preventDefault();
 		try {
-			// console.log("user auth is: ", userAuth);
 			const result = await authCodeLogin(authCode);
 
-			// const result = await login({ user_auth: userAuth });
-			console.log("login result is: ", result);
 			if (result.error) {
 				console.log("error logging in: ", result.error);
 				return;
