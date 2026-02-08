@@ -53,6 +53,7 @@ export const ConnectScreen: React.FC = () => {
 	const [connectError, setConnectError] = useState<string | null>(null);
 	const [selectedLocation, setSelectedLocation] =
 		useState<ConnectLocation | null>(null);
+	const [isLoggingOut, setIsLoggingOut] = useState(false);
 
 	// Load VPN state on mount
 	useEffect(() => {
@@ -69,12 +70,59 @@ export const ConnectScreen: React.FC = () => {
 			}
 		};
 
+		const loadSelectedLocation = async () => {
+			const stored = await chromeStorageAdapter.getItem(
+				"selected_connect_location",
+			);
+			if (stored) {
+				const location = JSON.parse(stored);
+				setSelectedLocation(location);
+			}
+		};
+
 		loadVpnState();
+		loadSelectedLocation();
 	}, []);
 
-	const connectLocation = (location: ConnectLocation) => {
+	useEffect(() => {
+		const refreshSelectedLocation = async () => {
+			if (!selectedLocation) {
+				return;
+			}
+
+			const flattenedLocations: ConnectLocation[] = [
+				...(filteredLocations.best_matches || []),
+				...(filteredLocations.countries || []),
+				...(filteredLocations.cities || []),
+				...(filteredLocations.devices || []),
+				...(filteredLocations.promoted || []),
+				...(filteredLocations.regions || []),
+			];
+
+			const targetLocation = flattenedLocations.find((loc) => {
+				return (
+					selectedLocation.connect_location_id?.location_id ===
+					loc.connect_location_id?.location_id
+				);
+			});
+
+			if (
+				targetLocation &&
+				targetLocation.provider_count !== selectedLocation.provider_count
+			) {
+				// only update if provider count is different
+				setSelectedLocation(targetLocation);
+			}
+		};
+		refreshSelectedLocation();
+	}, [selectedLocation, filteredLocations]);
+
+	const connectLocation = async (location: ConnectLocation) => {
 		setSelectedLocation(location);
-		// todo - should set in storage manager as well to persist selected location
+		await chromeStorageAdapter.setItem(
+			"selected_connect_location",
+			JSON.stringify(location),
+		);
 
 		handleConnect(location);
 	};
@@ -108,6 +156,12 @@ export const ConnectScreen: React.FC = () => {
 	const handleConnect = async (connectLocation?: ConnectLocation) => {
 		setIsConnecting(true);
 		setConnectError(null);
+
+		if (vpnState.enabled) {
+			// clean up existing connection first
+			// need to delete the previous network client id
+			await handleDisconnect();
+		}
 
 		const authParams: AuthNetworkClientArgs = {
 			description: "",
@@ -259,12 +313,18 @@ export const ConnectScreen: React.FC = () => {
 		}
 	};
 
-	const handleLogout = () => {
+	const handleLogout = async () => {
+		setIsLoggingOut(true);
+
 		// Disconnect VPN before logout
 		if (vpnState.enabled) {
-			handleDisconnect();
+			await handleDisconnect();
 		}
+
+		await chromeStorageAdapter.removeItem("selected_connect_location");
+
 		clearAuth();
+		setIsLoggingOut(false);
 	};
 
 	const handleLocationKey = (location: ConnectLocation): string => {
@@ -278,6 +338,16 @@ export const ConnectScreen: React.FC = () => {
 
 		return location.name ?? "";
 	};
+
+	if (isLoggingOut) {
+		return (
+			<Screen>
+				<div className="flex w-full justify-center py-ur-2xl">
+					<UrIconSpinner />
+				</div>
+			</Screen>
+		);
+	}
 
 	return (
 		<Screen>
