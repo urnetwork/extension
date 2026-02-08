@@ -14,7 +14,7 @@
 	"dependencies": {
 		"@crxjs/vite-plugin": "^2.3.0",
 		"@tailwindcss/vite": "^4.1.18",
-		"@urnetwork/elements": "file:../elements",
+		"@urnetwork/elements": "^0.0.1-beta.1",
 		"@urnetwork/localizations": "^0.0.1",
 		"@urnetwork/sdk-js": "file:../sdk/sdk-js",
 		"react": "^19.2.0",
