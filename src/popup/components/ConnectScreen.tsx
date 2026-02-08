@@ -7,12 +7,15 @@ import {
 	UrInput,
 	UrMenu,
 	UrMenuButton,
+	UrSelectedLocation,
 	UrText,
 } from "@urnetwork/elements/react";
 import {
+	parseByJwtClientId,
 	useAuth,
 	useAuthNetworkClient,
 	useProviderList,
+	useRemoveNetworkClient,
 } from "@urnetwork/sdk-js/react";
 import type { ProxyState } from "@/utils/proxy-manager";
 import { getMessage } from "@/utils/i18n";
@@ -22,6 +25,7 @@ import type {
 } from "node_modules/@urnetwork/sdk-js/dist/generated";
 import { UrLocationListItem } from "@urnetwork/elements/react";
 import { UrIconSpinner } from "@urnetwork/elements/react";
+import { chromeStorageAdapter } from "@/utils/storage-adapter";
 
 export const ConnectScreen: React.FC = () => {
 	const { clearAuth } = useAuth();
@@ -30,6 +34,8 @@ export const ConnectScreen: React.FC = () => {
 		error: authNetworkClientError,
 		authNetworkClient,
 	} = useAuthNetworkClient();
+
+	const { removeNetworkClient } = useRemoveNetworkClient();
 
 	const {
 		query,
@@ -42,9 +48,11 @@ export const ConnectScreen: React.FC = () => {
 		enabled: false,
 		config: null,
 	});
-	const [isConnectLoading, setIsConnectLoading] = useState(false);
+	const [isConnecting, setIsConnecting] = useState(false);
+	const [isDisconnecting, setIsDisconnecting] = useState(false);
 	const [connectError, setConnectError] = useState<string | null>(null);
-	// const [selectedLocation, setSelectedLocation] = useState<LocationResult[]>([]);
+	const [selectedLocation, setSelectedLocation] =
+		useState<ConnectLocation | null>(null);
 
 	// Load VPN state on mount
 	useEffect(() => {
@@ -64,28 +72,125 @@ export const ConnectScreen: React.FC = () => {
 		loadVpnState();
 	}, []);
 
-	const handleConnect = async () => {
-		setIsConnectLoading(true);
+	const connectLocation = (location: ConnectLocation) => {
+		setSelectedLocation(location);
+		// todo - should set in storage manager as well to persist selected location
+
+		handleConnect(location);
+	};
+
+	const setProxyClientId = async (clientId: string) => {
+		try {
+			await chromeStorageAdapter.setItem("proxy_client_id", clientId);
+		} catch (error) {
+			console.error("Error setting proxy client ID:", error);
+		}
+	};
+
+	const clearProxyClientId = async () => {
+		try {
+			await chromeStorageAdapter.removeItem("proxy_client_id");
+		} catch (error) {
+			console.error("Error removing proxy client ID:", error);
+		}
+	};
+
+	const getProxyClientId = async (): Promise<string | null> => {
+		try {
+			const clientId = await chromeStorageAdapter.getItem("proxy_client_id");
+			return clientId;
+		} catch (error) {
+			console.error("Error getting proxy client ID:", error);
+			return null;
+		}
+	};
+
+	const handleConnect = async (connectLocation?: ConnectLocation) => {
+		setIsConnecting(true);
 		setConnectError(null);
 
 		const authParams: AuthNetworkClientArgs = {
 			description: "",
 			device_spec: "",
 		};
-		const result = await authNetworkClient(authParams);
-		console.log("result is: ", result);
 
-		// reset token to new token now?
+		const locationForConnection = connectLocation ?? selectedLocation;
+
+		if (locationForConnection) {
+			authParams.proxy_config = {
+				lock_caller_ip: false,
+				lock_ip_list: [],
+				enable_socks: true,
+				enable_http: true,
+				http_require_auth: false,
+				initial_device_state: {
+					location: {
+						connect_location_id: {
+							location_id:
+								locationForConnection.connect_location_id?.location_id,
+						},
+						stable: true, // todo - these should be optional in the SDK
+						strong_privacy: true, // todo - these should be optional in the SDK
+					},
+					performance_profile: null,
+				},
+			};
+		}
+
+		const result = await authNetworkClient(authParams);
+		console.log("authNetworkClient result is: ", result);
+
+		if (result.error) {
+			console.error("Auth network client error:", result.error);
+			setConnectError(result.error.message);
+			setIsConnecting(false);
+			return;
+		}
+
+		if (!result.by_client_jwt) {
+			console.log("No client JWT returned");
+			setConnectError("Authentication failed: No client token received");
+			setIsConnecting(false);
+			return;
+		}
+
+		if (!result.proxy_config_result) {
+			console.log("No proxy config result returned");
+			setConnectError("No proxy configuration available");
+			setIsConnecting(false);
+			return;
+		}
+
+		if (!result.proxy_config_result.auth_token) {
+			console.log("No auth token in proxy config result");
+			setConnectError("No authentication token available for VPN");
+			setIsConnecting(false);
+			return;
+		}
+
+		if (!result.proxy_config_result.proxy_host) {
+			console.log("No proxy host in proxy config result");
+			setConnectError("No proxy host available for VPN");
+			setIsConnecting(false);
+			return;
+		}
+
+		if (!result.proxy_config_result.https_proxy_port) {
+			console.log("No proxy port in proxy config result");
+			setConnectError("No proxy port available for VPN");
+			setIsConnecting(false);
+			return;
+		}
+
+		const proxyClientId = parseByJwtClientId(result.by_client_jwt);
+		console.log("proxyClientId: ", proxyClientId);
+		// replace old token with new token?
 
 		try {
-			// TODO: Replace with your actual VPN server details
-			// You might want to get this from your URnetwork API
 			const config = {
-				host: "your-vpn-server.com", // Replace with your VPN server
-				port: 1080, // Replace with your VPN port
-				scheme: "socks5" as const, // or 'http', 'https', 'socks4'
-				// username: 'user', // Optional: if your VPN requires auth
-				// password: 'pass', // Optional: if your VPN requires auth
+				host: `${result.proxy_config_result.auth_token}.${result.proxy_config_result.proxy_host}`, // Replace with your VPN server
+				port: result.proxy_config_result.https_proxy_port,
+				scheme: "https" as const, // or 'http', 'https', 'socks4'
 			};
 
 			const response = await chrome.runtime.sendMessage({
@@ -95,18 +200,20 @@ export const ConnectScreen: React.FC = () => {
 
 			if (response.success) {
 				setVpnState({ enabled: true, config });
+				setProxyClientId(proxyClientId);
 			} else {
 				setConnectError(response.error || "Failed to enable VPN");
 			}
 		} catch (err) {
+			console.log("error enabling vpn:", err);
 			setConnectError(err instanceof Error ? err.message : "Unknown error");
 		} finally {
-			setIsConnectLoading(false);
+			setIsConnecting(false);
 		}
 	};
 
 	const handleDisconnect = async () => {
-		setIsConnectLoading(true);
+		setIsDisconnecting(true);
 		setConnectError(null);
 
 		try {
@@ -116,13 +223,39 @@ export const ConnectScreen: React.FC = () => {
 
 			if (response.success) {
 				setVpnState({ enabled: false, config: null });
+				// todo - remove network client
 			} else {
 				setConnectError(response.error || "Failed to disable VPN");
 			}
+
+			const proxyClientId = await getProxyClientId();
+
+			if (!proxyClientId) {
+				console.log("No proxy client ID found for removal");
+				return;
+			}
+
+			const removeNetworkClientResult =
+				await removeNetworkClient(proxyClientId);
+			console.log(
+				"remove network client result is: ",
+				removeNetworkClientResult,
+			);
+
+			if (removeNetworkClientResult.error) {
+				console.error(
+					"Error removing network client:",
+					removeNetworkClientResult.error,
+				);
+			} else {
+				console.log("Network client removed successfully");
+				await clearProxyClientId();
+			}
 		} catch (err) {
+			console.log("error disabling vpn:", err);
 			setConnectError(err instanceof Error ? err.message : "Unknown error");
 		} finally {
-			setIsConnectLoading(false);
+			setIsDisconnecting(false);
 		}
 	};
 
@@ -132,6 +265,18 @@ export const ConnectScreen: React.FC = () => {
 			handleDisconnect();
 		}
 		clearAuth();
+	};
+
+	const handleLocationKey = (location: ConnectLocation): string => {
+		if (location.country_code && location.country_code.length > 0) {
+			return location.country_code;
+		}
+
+		if (location.connect_location_id?.location_id) {
+			return location.connect_location_id.location_id;
+		}
+
+		return location.name ?? "";
 	};
 
 	return (
@@ -153,10 +298,27 @@ export const ConnectScreen: React.FC = () => {
 						</UrMenu>
 					</div>
 
+					<div className="mb-ur-sm">
+						{!selectedLocation && (
+							<UrSelectedLocation locationKey="best-available-provider" />
+						)}
+
+						{selectedLocation && (
+							<UrSelectedLocation
+								key={handleLocationKey(selectedLocation)} // for React
+								locationKey={handleLocationKey(selectedLocation)} // for generating color
+								name={selectedLocation.name}
+								providerCount={selectedLocation.provider_count}
+								strongPrivacy={selectedLocation.strong_privacy}
+								unstable={!selectedLocation.stable}
+							/>
+						)}
+					</div>
+
 					{vpnState.enabled && (
 						<UrButton
 							onClick={handleDisconnect}
-							loading={isConnectLoading}
+							loading={isDisconnecting}
 							variant="secondary"
 							fullWidth
 						>
@@ -166,8 +328,8 @@ export const ConnectScreen: React.FC = () => {
 
 					{!vpnState.enabled && (
 						<UrButton
-							onClick={handleConnect}
-							loading={isConnectLoading}
+							onClick={() => handleConnect()}
+							loading={isConnecting}
 							fullWidth
 						>
 							<UrText>{getMessage("connect")}</UrText>
@@ -201,6 +363,8 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsGroup
 								groupLabel="Best Matches"
 								locations={filteredLocations.best_matches}
+								onSelect={connectLocation}
+								handleLocationKey={handleLocationKey}
 							/>
 						)}
 
@@ -209,6 +373,8 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsGroup
 								groupLabel="Countries"
 								locations={filteredLocations.countries}
+								onSelect={connectLocation}
+								handleLocationKey={handleLocationKey}
 							/>
 						)}
 
@@ -216,6 +382,8 @@ export const ConnectScreen: React.FC = () => {
 						<LocationsGroup
 							groupLabel="Cities"
 							locations={filteredLocations.cities}
+							onSelect={connectLocation}
+							handleLocationKey={handleLocationKey}
 						/>
 					)}
 
@@ -224,6 +392,8 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsGroup
 								groupLabel="Devices"
 								locations={filteredLocations.devices}
+								onSelect={connectLocation}
+								handleLocationKey={handleLocationKey}
 							/>
 						)}
 
@@ -232,6 +402,8 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsGroup
 								groupLabel="Promoted"
 								locations={filteredLocations.promoted}
+								onSelect={connectLocation}
+								handleLocationKey={handleLocationKey}
 							/>
 						)}
 
@@ -240,6 +412,8 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsGroup
 								groupLabel="Regions"
 								locations={filteredLocations.regions}
+								onSelect={connectLocation}
+								handleLocationKey={handleLocationKey}
 							/>
 						)}
 				</div>
@@ -251,24 +425,16 @@ export const ConnectScreen: React.FC = () => {
 interface LocationsGroupProps {
 	groupLabel: string;
 	locations: ConnectLocation[];
+	onSelect: (connectLocation: ConnectLocation) => void;
+	handleLocationKey: (location: ConnectLocation) => string;
 }
 
 export const LocationsGroup: React.FC<LocationsGroupProps> = ({
 	groupLabel,
 	locations,
+	onSelect,
+	handleLocationKey,
 }: LocationsGroupProps) => {
-	const handleLocationKey = (location: ConnectLocation): string => {
-		if (location.country_code && location.country_code.length > 0) {
-			return location.country_code;
-		}
-
-		if (location.connect_location_id?.location_id) {
-			return location.connect_location_id.location_id;
-		}
-
-		return location.name ?? "";
-	};
-
 	return (
 		<>
 			<div className="sticky top-0 bg-ur-black z-10 px-ur-md py-ur-sm text-left border-b border-(--ur-color-border) shadow-md">
@@ -283,7 +449,7 @@ export const LocationsGroup: React.FC<LocationsGroupProps> = ({
 						name={location.name}
 						providerCount={location.provider_count}
 						onClick={() => {
-							console.log("select:", location.name);
+							onSelect(location);
 						}}
 						strongPrivacy={location.strong_privacy}
 						unstable={!location.stable}
