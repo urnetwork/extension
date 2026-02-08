@@ -29,11 +29,8 @@ import { chromeStorageAdapter } from "@/utils/storage-adapter";
 
 export const ConnectScreen: React.FC = () => {
 	const { clearAuth } = useAuth();
-	const {
-		// loading: isAuthNetworkClientLoading,
-		error: authNetworkClientError,
-		authNetworkClient,
-	} = useAuthNetworkClient();
+	const { error: authNetworkClientError, authNetworkClient } =
+		useAuthNetworkClient();
 
 	const { removeNetworkClient } = useRemoveNetworkClient();
 
@@ -202,42 +199,41 @@ export const ConnectScreen: React.FC = () => {
 		}
 
 		if (!result.by_client_jwt) {
-			console.log("No client JWT returned");
+			console.error("No client JWT returned");
 			setConnectError("Authentication failed: No client token received");
 			setIsConnecting(false);
 			return;
 		}
 
 		if (!result.proxy_config_result) {
-			console.log("No proxy config result returned");
+			console.error("No proxy config result returned");
 			setConnectError("No proxy configuration available");
 			setIsConnecting(false);
 			return;
 		}
 
 		if (!result.proxy_config_result.auth_token) {
-			console.log("No auth token in proxy config result");
+			console.error("No auth token in proxy config result");
 			setConnectError("No authentication token available for VPN");
 			setIsConnecting(false);
 			return;
 		}
 
 		if (!result.proxy_config_result.proxy_host) {
-			console.log("No proxy host in proxy config result");
+			console.error("No proxy host in proxy config result");
 			setConnectError("No proxy host available for VPN");
 			setIsConnecting(false);
 			return;
 		}
 
 		if (!result.proxy_config_result.https_proxy_port) {
-			console.log("No proxy port in proxy config result");
+			console.error("No proxy port in proxy config result");
 			setConnectError("No proxy port available for VPN");
 			setIsConnecting(false);
 			return;
 		}
 
 		const proxyClientId = parseByJwtClientId(result.by_client_jwt);
-		console.log("proxyClientId: ", proxyClientId);
 		// replace old token with new token?
 
 		try {
@@ -277,7 +273,6 @@ export const ConnectScreen: React.FC = () => {
 
 			if (response.success) {
 				setVpnState({ enabled: false, config: null });
-				// todo - remove network client
 			} else {
 				setConnectError(response.error || "Failed to disable VPN");
 			}
@@ -291,10 +286,6 @@ export const ConnectScreen: React.FC = () => {
 
 			const removeNetworkClientResult =
 				await removeNetworkClient(proxyClientId);
-			console.log(
-				"remove network client result is: ",
-				removeNetworkClientResult,
-			);
 
 			if (removeNetworkClientResult.error) {
 				console.error(
@@ -302,11 +293,10 @@ export const ConnectScreen: React.FC = () => {
 					removeNetworkClientResult.error,
 				);
 			} else {
-				console.log("Network client removed successfully");
 				await clearProxyClientId();
 			}
 		} catch (err) {
-			console.log("error disabling vpn:", err);
+			console.error("error disabling vpn:", err);
 			setConnectError(err instanceof Error ? err.message : "Unknown error");
 		} finally {
 			setIsDisconnecting(false);
@@ -514,7 +504,7 @@ export const LocationsGroup: React.FC<LocationsGroupProps> = ({
 			<ul>
 				{locations.map((location) => (
 					<UrLocationListItem
-						key={handleLocationKey(location)} // for React
+						key={handleLocationKey(location)}
 						locationKey={handleLocationKey(location)} // for generating color
 						name={location.name}
 						providerCount={location.provider_count}
