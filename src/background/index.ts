@@ -56,7 +56,7 @@ chrome.runtime.onMessageExternal.addListener(
 	},
 );
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	console.log("Received internal message:", message);
 
 	// Handle VPN enable request
