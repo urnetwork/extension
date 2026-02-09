@@ -26,7 +26,7 @@ export default defineManifest({
 		service_worker: "src/background/index.ts",
 		type: "module",
 	},
-	permissions: ["contentSettings", "proxy", "storage"],
+	permissions: ["proxy", "storage"],
 	//
 	host_permissions: ["<all_urls>"],
 	web_accessible_resources: [
