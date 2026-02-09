@@ -27,8 +27,7 @@ export default defineManifest({
 		type: "module",
 	},
 	permissions: ["proxy", "storage"],
-	//
-	host_permissions: ["<all_urls>"],
+	host_permissions: ["https://api.bringyour.com/*"],
 	web_accessible_resources: [
 		{
 			resources: ["wasm/sdk.wasm", "wasm/wasm_exec.js"],
