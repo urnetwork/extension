@@ -124,6 +124,12 @@ export const ConnectScreen: React.FC = () => {
 		handleConnect(location);
 	};
 
+	const connectBestAvailable = async () => {
+		setSelectedLocation(null);
+		await chromeStorageAdapter.removeItem("selected_connect_location");
+		handleConnect();
+	};
+
 	const setProxyClientId = async (clientId: string) => {
 		try {
 			await chromeStorageAdapter.setItem("proxy_client_id", clientId);
@@ -165,9 +171,7 @@ export const ConnectScreen: React.FC = () => {
 			device_spec: "",
 		};
 
-		const locationForConnection = connectLocation ?? selectedLocation;
-
-		if (locationForConnection) {
+		if (connectLocation) {
 			authParams.proxy_config = {
 				lock_caller_ip: false,
 				lock_ip_list: [],
@@ -177,8 +181,28 @@ export const ConnectScreen: React.FC = () => {
 				initial_device_state: {
 					location: {
 						connect_location_id: {
-							location_id:
-								locationForConnection.connect_location_id?.location_id,
+							location_id: connectLocation.connect_location_id?.location_id,
+						},
+						stable: true, // todo - these should be optional in the SDK
+						strong_privacy: true, // todo - these should be optional in the SDK
+					},
+					performance_profile: null,
+				},
+			};
+		} else {
+			/**
+			 * connect best available
+			 */
+			authParams.proxy_config = {
+				lock_caller_ip: false,
+				lock_ip_list: [],
+				enable_socks: true,
+				enable_http: true,
+				http_require_auth: false,
+				initial_device_state: {
+					location: {
+						connect_location_id: {
+							best_available: true,
 						},
 						stable: true, // todo - these should be optional in the SDK
 						strong_privacy: true, // todo - these should be optional in the SDK
@@ -317,7 +341,11 @@ export const ConnectScreen: React.FC = () => {
 		setIsLoggingOut(false);
 	};
 
-	const handleLocationKey = (location: ConnectLocation): string => {
+	const handleLocationKey = (location?: ConnectLocation): string => {
+		if (!location) {
+			return "best-available-provider";
+		}
+
 		if (location.country_code && location.country_code.length > 0) {
 			return location.country_code;
 		}
@@ -403,8 +431,8 @@ export const ConnectScreen: React.FC = () => {
 				</div>
 
 				<UrInput
-					label="Search Providers"
-					placeholder="Search countries, states, cities..."
+					label={getMessage("search_providers_input_label")}
+					placeholder={getMessage("search_providers_input_placeholder")}
 					value={query}
 					onInput={(e) => setQuery(e.detail.value)}
 				/>
@@ -418,10 +446,27 @@ export const ConnectScreen: React.FC = () => {
 
 			{!locationsLoading && (
 				<div id="locations-list" className="flex-1 overflow-y-auto pb-ur-md">
+					{/** "best available" */}
+					{query.length == 0 && (
+						<>
+							<LocationsGroupLabel groupLabel={getMessage("promoted")} />
+							<ul>
+								<UrLocationListItem
+									key={handleLocationKey()}
+									locationKey={handleLocationKey()} // for generating color
+									name={getMessage("best_available_provider")}
+									onClick={connectBestAvailable}
+									strongPrivacy={false}
+									unstable={false}
+								/>
+							</ul>
+						</>
+					)}
+
 					{filteredLocations.best_matches &&
 						filteredLocations.best_matches.length > 0 && (
 							<LocationsGroup
-								groupLabel="Best Matches"
+								groupLabel={getMessage("best_matches")}
 								locations={filteredLocations.best_matches}
 								onSelect={connectLocation}
 								handleLocationKey={handleLocationKey}
@@ -431,7 +476,7 @@ export const ConnectScreen: React.FC = () => {
 					{filteredLocations.countries &&
 						filteredLocations.countries.length > 0 && (
 							<LocationsGroup
-								groupLabel="Countries"
+								groupLabel={getMessage("countries")}
 								locations={filteredLocations.countries}
 								onSelect={connectLocation}
 								handleLocationKey={handleLocationKey}
@@ -440,7 +485,7 @@ export const ConnectScreen: React.FC = () => {
 
 					{filteredLocations.cities && filteredLocations.cities.length > 0 && (
 						<LocationsGroup
-							groupLabel="Cities"
+							groupLabel={getMessage("cities")}
 							locations={filteredLocations.cities}
 							onSelect={connectLocation}
 							handleLocationKey={handleLocationKey}
@@ -450,18 +495,8 @@ export const ConnectScreen: React.FC = () => {
 					{filteredLocations.devices &&
 						filteredLocations.devices.length > 0 && (
 							<LocationsGroup
-								groupLabel="Devices"
+								groupLabel={getMessage("devices")}
 								locations={filteredLocations.devices}
-								onSelect={connectLocation}
-								handleLocationKey={handleLocationKey}
-							/>
-						)}
-
-					{filteredLocations.promoted &&
-						filteredLocations.promoted.length > 0 && (
-							<LocationsGroup
-								groupLabel="Promoted"
-								locations={filteredLocations.promoted}
 								onSelect={connectLocation}
 								handleLocationKey={handleLocationKey}
 							/>
@@ -470,7 +505,7 @@ export const ConnectScreen: React.FC = () => {
 					{filteredLocations.regions &&
 						filteredLocations.regions.length > 0 && (
 							<LocationsGroup
-								groupLabel="Regions"
+								groupLabel={getMessage("regions")}
 								locations={filteredLocations.regions}
 								onSelect={connectLocation}
 								handleLocationKey={handleLocationKey}
@@ -497,9 +532,7 @@ export const LocationsGroup: React.FC<LocationsGroupProps> = ({
 }: LocationsGroupProps) => {
 	return (
 		<>
-			<div className="sticky top-0 bg-ur-black z-10 px-ur-md py-ur-sm text-left border-b border-(--ur-color-border) shadow-md">
-				<UrText variant="body">{groupLabel}</UrText>
-			</div>
+			<LocationsGroupLabel groupLabel={groupLabel} />
 
 			<ul>
 				{locations.map((location) => (
@@ -517,6 +550,20 @@ export const LocationsGroup: React.FC<LocationsGroupProps> = ({
 				))}
 			</ul>
 		</>
+	);
+};
+
+interface LocationsGroupLabelProps {
+	groupLabel: string;
+}
+
+export const LocationsGroupLabel: React.FC<LocationsGroupLabelProps> = ({
+	groupLabel,
+}: LocationsGroupLabelProps) => {
+	return (
+		<div className="sticky top-0 bg-ur-black z-10 px-ur-md py-ur-sm text-left border-b border-t border-(--ur-color-border) shadow-md">
+			<UrText variant="body">{groupLabel}</UrText>
+		</div>
 	);
 };
 
