@@ -10,9 +10,9 @@
 		"build": "tsc -b && vite build",
 		"lint": "eslint .",
 		"preview": "vite preview",
-		"version:patch": "npm version patch --no-git-tag-version",
-		"version:minor": "npm version minor --no-git-tag-version",
-		"version:major": "npm version major --no-git-tag-version"
+		"version:patch": "npm version patch",
+		"version:minor": "npm version minor",
+		"version:major": "npm version major"
 	},
 	"dependencies": {
 		"@crxjs/vite-plugin": "^2.3.0",
