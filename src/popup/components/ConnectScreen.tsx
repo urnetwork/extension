@@ -4,6 +4,7 @@ import {
 	MenuItem,
 	UrButton,
 	UrIconHamburger,
+	UrIconNetworkInstability,
 	UrInput,
 	UrMenu,
 	UrMenuButton,
@@ -38,7 +39,9 @@ export const ConnectScreen: React.FC = () => {
 		query,
 		setQuery,
 		filteredLocations,
+		error: loadingLocationsError,
 		loading: locationsLoading,
+		retry,
 	} = useProviderList();
 
 	const [vpnState, setVpnState] = useState<ProxyState>({
@@ -213,7 +216,6 @@ export const ConnectScreen: React.FC = () => {
 		}
 
 		const result = await authNetworkClient(authParams);
-		console.log("authNetworkClient result is: ", result);
 
 		if (result.error) {
 			console.error("Auth network client error:", result.error);
@@ -445,73 +447,95 @@ export const ConnectScreen: React.FC = () => {
 			)}
 
 			{!locationsLoading && (
-				<div id="locations-list" className="flex-1 overflow-y-auto pb-ur-md">
-					{/** "best available" */}
-					{query.length == 0 && (
-						<>
-							<LocationsGroupLabel groupLabel={getMessage("promoted")} />
-							<ul>
-								<UrLocationListItem
-									key={handleLocationKey()}
-									locationKey={handleLocationKey()} // for generating color
-									name={getMessage("best_available_provider")}
-									onClick={connectBestAvailable}
-									strongPrivacy={false}
-									unstable={false}
-								/>
-							</ul>
-						</>
+				<>
+					{loadingLocationsError && (
+						<div className="flex flex-col items-center justify-center py-ur-lg">
+							<UrIconNetworkInstability className="color-ur-yellow-light size-ur-lg" />
+
+							<UrText variant="small" className="mb-ur-lg text-ur-gray">
+								Something went wrong
+							</UrText>
+
+							<UrButton variant="secondary" onClick={() => retry()}>
+								<UrText>Retry</UrText>
+							</UrButton>
+						</div>
 					)}
 
-					{filteredLocations.best_matches &&
-						filteredLocations.best_matches.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("best_matches")}
-								locations={filteredLocations.best_matches}
-								onSelect={connectLocation}
-								handleLocationKey={handleLocationKey}
-							/>
-						)}
+					{!loadingLocationsError && (
+						<div
+							id="locations-list"
+							className="flex-1 overflow-y-auto pb-ur-md"
+						>
+							{/** "best available" */}
+							{query.length == 0 && (
+								<>
+									<LocationsGroupLabel groupLabel={getMessage("promoted")} />
+									<ul>
+										<UrLocationListItem
+											key={handleLocationKey()}
+											locationKey={handleLocationKey()} // for generating color
+											name={getMessage("best_available_provider")}
+											onClick={connectBestAvailable}
+											strongPrivacy={false}
+											unstable={false}
+										/>
+									</ul>
+								</>
+							)}
 
-					{filteredLocations.countries &&
-						filteredLocations.countries.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("countries")}
-								locations={filteredLocations.countries}
-								onSelect={connectLocation}
-								handleLocationKey={handleLocationKey}
-							/>
-						)}
+							{filteredLocations.best_matches &&
+								filteredLocations.best_matches.length > 0 && (
+									<LocationsGroup
+										groupLabel={getMessage("best_matches")}
+										locations={filteredLocations.best_matches}
+										onSelect={connectLocation}
+										handleLocationKey={handleLocationKey}
+									/>
+								)}
 
-					{filteredLocations.cities && filteredLocations.cities.length > 0 && (
-						<LocationsGroup
-							groupLabel={getMessage("cities")}
-							locations={filteredLocations.cities}
-							onSelect={connectLocation}
-							handleLocationKey={handleLocationKey}
-						/>
+							{filteredLocations.countries &&
+								filteredLocations.countries.length > 0 && (
+									<LocationsGroup
+										groupLabel={getMessage("countries")}
+										locations={filteredLocations.countries}
+										onSelect={connectLocation}
+										handleLocationKey={handleLocationKey}
+									/>
+								)}
+
+							{filteredLocations.cities &&
+								filteredLocations.cities.length > 0 && (
+									<LocationsGroup
+										groupLabel={getMessage("cities")}
+										locations={filteredLocations.cities}
+										onSelect={connectLocation}
+										handleLocationKey={handleLocationKey}
+									/>
+								)}
+
+							{filteredLocations.devices &&
+								filteredLocations.devices.length > 0 && (
+									<LocationsGroup
+										groupLabel={getMessage("devices")}
+										locations={filteredLocations.devices}
+										onSelect={connectLocation}
+										handleLocationKey={handleLocationKey}
+									/>
+								)}
+
+							{filteredLocations.regions &&
+								filteredLocations.regions.length > 0 && (
+									<LocationsGroup
+										groupLabel={getMessage("regions")}
+										locations={filteredLocations.regions}
+										onSelect={connectLocation}
+										handleLocationKey={handleLocationKey}
+									/>
+								)}
+						</div>
 					)}
-
-					{filteredLocations.devices &&
-						filteredLocations.devices.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("devices")}
-								locations={filteredLocations.devices}
-								onSelect={connectLocation}
-								handleLocationKey={handleLocationKey}
-							/>
-						)}
-
-					{filteredLocations.regions &&
-						filteredLocations.regions.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("regions")}
-								locations={filteredLocations.regions}
-								onSelect={connectLocation}
-								handleLocationKey={handleLocationKey}
-							/>
-						)}
-				</div>
+				</>
 			)}
 		</Screen>
 	);

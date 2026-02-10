@@ -1,6 +1,5 @@
 import { MemoryRouter } from "react-router-dom";
 import "./App.css";
-// import { AuthContextProvider } from "./context/AuthContextProvider";
 import { AppRoutes } from "./components/AppRoutes";
 import { chromeStorageAdapter } from "../utils/storage-adapter";
 import { AuthProvider, URNetworkAPIProvider } from "@urnetwork/sdk-js/react";
