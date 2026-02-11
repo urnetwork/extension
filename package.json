@@ -19,7 +19,7 @@
 		"@crxjs/vite-plugin": "^2.3.0",
 		"@tailwindcss/vite": "^4.1.18",
 		"@urnetwork/elements": "^0.0.1-beta.3",
-		"@urnetwork/localizations": "^0.0.5",
+		"@urnetwork/localizations": "^0.0.6",
 		"@urnetwork/sdk-js": "^0.0.1-beta.5",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
