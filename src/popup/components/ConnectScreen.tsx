@@ -453,11 +453,11 @@ export const ConnectScreen: React.FC = () => {
 							<UrIconNetworkInstability className="color-ur-yellow-light size-ur-lg" />
 
 							<UrText variant="small" className="mb-ur-lg text-ur-gray">
-								Something went wrong
+								{getMessage("something_went_wrong")}
 							</UrText>
 
 							<UrButton variant="secondary" onClick={() => retry()}>
-								<UrText>Retry</UrText>
+								<UrText>{getMessage("retry")}</UrText>
 							</UrButton>
 						</div>
 					)}
