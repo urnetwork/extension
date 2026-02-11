@@ -28,6 +28,7 @@ export default defineConfig({
 		zip({
 			outDir: "release",
 			outFileName: `crx-${name.replace("/", "-")}-${version}.zip`,
+			filter: (fileName) => !fileName.includes(".vite"),
 		}),
 		tailwindcss(),
 	],

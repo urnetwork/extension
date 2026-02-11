@@ -35,11 +35,7 @@ export default defineManifest({
 		},
 	],
 	externally_connectable: {
-		matches: [
-			"https://localhost:*/*",
-			"https://ur.io/*",
-			"https://app.ur.network/*",
-		],
+		matches: ["https://ur.io/*", "https://app.ur.network/*"],
 	},
 	// side_panel: {
 	//   default_path: "src/sidepanel/index.html",
