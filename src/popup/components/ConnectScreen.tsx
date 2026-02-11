@@ -442,7 +442,7 @@ export const ConnectScreen: React.FC = () => {
 
 			{locationsLoading && (
 				<div className="flex py-ur-lg justify-center">
-					<UrIconSpinner />
+					<UrIconSpinner size={1.2} />
 				</div>
 			)}
 
