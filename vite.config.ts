@@ -14,6 +14,9 @@ export default defineConfig({
 			"@": `${path.resolve(__dirname, "src")}`,
 		},
 	},
+	build: {
+		manifest: false,
+	},
 	plugins: [
 		react(),
 		crx({ manifest }),
@@ -28,6 +31,7 @@ export default defineConfig({
 		zip({
 			outDir: "release",
 			outFileName: `crx-${name.replace("/", "-")}-${version}.zip`,
+			filter: (fileName) => !fileName.includes(".vite"), // Simple and robust filter
 		}),
 		tailwindcss(),
 	],

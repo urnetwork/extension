@@ -4,10 +4,11 @@
 	"version": "0.0.2",
 	"type": "module",
 	"scripts": {
+		"clean": "rm -rf dist",
 		"predev": "node scripts/build-locales.js",
 		"dev": "vite",
 		"prebuild": "node scripts/build-locales.js",
-		"build": "tsc -b && vite build",
+		"build": "npm run clean && tsc -b && vite build",
 		"lint": "eslint .",
 		"preview": "vite preview",
 		"version:patch": "npm version patch",
