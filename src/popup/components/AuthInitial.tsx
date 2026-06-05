@@ -1,95 +1,77 @@
-import React, { useEffect } from "react";
-
+import React, { useEffect, useState } from "react";
 import { UrButton, UrInput, UrText } from "@urnetwork/elements/react";
 import { getMessage } from "@/utils/i18n";
 import { useAuth, useAuthCodeLogin } from "@urnetwork/sdk-js/react";
 import { Screen } from "./Screen";
 
+interface JWTReceivedMessage {
+	type: "JWT_RECEIVED";
+	jwt: string;
+	networkName?: string;
+}
+
 const AuthInitial: React.FC = () => {
-	const [authCode, setAuthCode] = React.useState("");
+	const [authCode, setAuthCode] = useState("");
 	const { setAuth } = useAuth();
-
 	const { authCodeLogin, loading, error } = useAuthCodeLogin();
-	interface JWTReceivedMessage {
-		type: "JWT_RECEIVED";
-		jwt: string;
-		networkName?: string;
-	}
 
-	// Check for JWT from website on component mount
+	// Listen for JWT forwarded from the background script (set via external website)
 	useEffect(() => {
 		const messageListener = (message: JWTReceivedMessage) => {
 			if (message.type === "JWT_RECEIVED" && message.jwt) {
-				console.log("Received JWT from website via background script");
 				setAuth(message.jwt, message.networkName);
 			}
 		};
 
 		chrome.runtime.onMessage.addListener(messageListener);
-
-		return () => {
-			chrome.runtime.onMessage.removeListener(messageListener);
-		};
+		return () => chrome.runtime.onMessage.removeListener(messageListener);
 	}, [setAuth]);
 
-	const handleLogin = async (e?: React.FormEvent | Event) => {
+	const handleLogin = async (e?: React.FormEvent) => {
 		if (e) e.preventDefault();
+		if (!authCode.trim()) return;
+
 		try {
-			const result = await authCodeLogin(authCode);
-
-			if (result.error) {
-				console.log("error logging in: ", result.error);
-				return;
-			}
-
-			if (result.by_jwt && result.by_jwt.length > 0) {
-				setAuth(result.by_jwt);
-			}
+			const result = await authCodeLogin(authCode.trim());
+			if (result.error) return; // error displayed via `error` from hook
+			if (result.by_jwt) setAuth(result.by_jwt);
 		} catch (err) {
 			console.error("Login failed:", err);
 		}
 	};
 
 	const renderInstructionsWithLink = (text: string): React.ReactNode => {
-		// Replace markers with unique tokens
-		const linkStart = "___LINK_START___";
-		const linkEnd = "___LINK_END___";
-
-		const replaced = text
-			.replace("{link}", linkStart)
-			.replace("{/link}", linkEnd);
-
-		const parts = replaced.split(new RegExp(`(${linkStart}|${linkEnd})`));
-
-		const elements: React.ReactNode[] = [];
-		let buffer: string[] = [];
+		const parts = text.split(/(\{link\}|\{\/link\})/);
+		const nodes: React.ReactNode[] = [];
 		let inLink = false;
+		let linkBuffer: string[] = [];
 
 		parts.forEach((part, i) => {
-			if (part === linkStart) {
+			if (part === "{link}") {
 				inLink = true;
-				buffer = [];
-			} else if (part === linkEnd) {
+				linkBuffer = [];
+			} else if (part === "{/link}") {
 				inLink = false;
-				elements.push(
+				nodes.push(
 					<a
-						key={`link-${i}`}
+						key={i}
 						href="https://ur.io"
 						target="_blank"
 						rel="noopener noreferrer"
+						className="text-ur-blue-electric underline"
 					>
-						{buffer.join("")}
+						{linkBuffer.join("")}
 					</a>,
 				);
-				buffer = [];
+				linkBuffer = [];
 			} else if (inLink) {
-				buffer.push(part);
+				linkBuffer.push(part);
 			} else {
-				elements.push(part);
+				nodes.push(part);
 			}
 		});
 
-		return <>{elements}</>;
+		return <>{nodes}</>;
 	};
 
 	return (
@@ -117,8 +99,9 @@ const AuthInitial: React.FC = () => {
 
 					<UrButton
 						buttonType="submit"
-						onClick={handleLogin}
+						onClick={() => handleLogin()}
 						loading={loading}
+						disabled={loading || !authCode.trim()}
 						fullWidth
 						className="mb-ur-lg"
 					>
@@ -132,7 +115,13 @@ const AuthInitial: React.FC = () => {
 					)}
 				</UrText>
 
-				{error && <UrText variant="body">{error.message}</UrText>}
+				{error && (
+					<div className="mt-ur-sm">
+						<UrText variant="small" className="text-ur-coral">
+							{error.message}
+						</UrText>
+					</div>
+				)}
 			</div>
 		</Screen>
 	);

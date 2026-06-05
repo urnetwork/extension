@@ -8,7 +8,13 @@ import { name, version } from "./package.json";
 import tailwindcss from "@tailwindcss/vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
+const isFirefox = process.env.BROWSER_TARGET === "firefox";
+const outDir = isFirefox ? "dist-firefox" : "dist";
+
 export default defineConfig({
+	build: {
+		outDir,
+	},
 	resolve: {
 		alias: {
 			"@": `${path.resolve(__dirname, "src")}`,
@@ -26,8 +32,11 @@ export default defineConfig({
 			],
 		}),
 		zip({
+			inDir: outDir,
 			outDir: "release",
-			outFileName: `crx-${name.replace("/", "-")}-${version}.zip`,
+			outFileName: isFirefox
+				? `crx-${name.replace("/", "-")}-${version}-firefox.zip`
+				: `crx-${name.replace("/", "-")}-${version}.zip`,
 			filter: (fileName) => !fileName.includes(".vite"),
 		}),
 		tailwindcss(),

@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "要获取您的认证码，请创建账户并登录{link}ur.io{/link}。登录后，复制认证码并用于登录扩展程序。",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "认证码无效或已过期。请登录 ur.io 获取有效认证码。",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "认证码",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "输入您的一次性认证码",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "返回",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "最佳可用提供商",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "最佳匹配",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "城市",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "连接",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "继续",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "国家",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "设备",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "断开连接",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "没看到吗？",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "忘记密码？",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "开始使用",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "很高兴再次见到你",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "加入 URnetwork",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "启动",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "网络名称必须为6个字符或以上",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "网络名称",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "您的网络名称",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "该网络名称已被占用",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "密码",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "密码必须至少包含12个字符",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "推广",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "地区",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "重新发送验证码",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "重置",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "重试",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "搜索提供商",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "搜索国家、省份、城市...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "出现了问题",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "保持完全私密和匿名",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "我同意 URnetwork 的{terms_start}条款和服务{terms_end}以及{privacy_start}隐私政策{privacy_end}",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "电子邮件或电话号码",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "输入您的电子邮件或电话号码",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "告诉我们你是谁。输入我们发送给你的验证码以验证你的身份。",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "验证您的验证码时出现问题。",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "验证码",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "你收到邮件了",
+    "description": "Header for verify screen"
+  }
+}

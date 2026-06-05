@@ -2,7 +2,12 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { loadAllKeys } from "@urnetwork/localizations";
+import * as localizationsPkg from "@urnetwork/localizations";
+
+const loadAllKeys = localizationsPkg.loadAllKeys || localizationsPkg.default?.loadAllKeys;
+if (typeof loadAllKeys !== "function") {
+	throw new TypeError("@urnetwork/localizations did not expose loadAllKeys");
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outputDir = path.join(__dirname, "../public/_locales");

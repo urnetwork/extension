@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "כדי לגשת לקוד האימות שלך, צור חשבון והתחבר ל-{link}ur.io{/link}. לאחר ההתחברות, העתק קוד אימות והשתמש בו כדי להיכנס להרחבה.",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "קוד האימות לא תקף או שפג תוקפו. אנא התחבר ל-ur.io כדי לקבל קוד תקף.",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "קוד אימות",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "הזן את קוד האימות החד-פעמי שלך",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "חזור",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "הספק הזמין הטוב ביותר",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "התאמות הטובות ביותר",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "ערים",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "התחבר",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "המשך",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "מדינות",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "מכשירים",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "התנתק",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "לא רואה את זה?",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "שכחת את הסיסמה?",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "התחל",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "נעים לראות אותך שוב",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "הצטרף ל-URnetwork",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "הפעל",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "שמות רשת חייבים להכיל 6 תווים או יותר",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "שם הרשת",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "שם הרשת שלך",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "שם הרשת הזה כבר תפוס",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "סיסמה",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "הסיסמה חייבת להיות באורך של לפחות 12 תווים",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "מקודם",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "אזורים",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "שלח קוד שוב",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "אפס סיסמה",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "נסה שוב",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "חפש ספקים",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "חפש מדינות, מחוזות, ערים...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "משהו השתבש",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "הישאר פרטי ואנונימי לחלוטין",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "אני מסכים/ה ל{terms_start}תנאים והשירותים{terms_end} ול{privacy_start}מדיניות הפרטיות{privacy_end} של URnetwork",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "אימייל או מספר טלפון",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "הזן את האימייל או מספר הטלפון שלך",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "ספר לנו מי אתה באמת. הזן את הקוד ששלחנו לך כדי לאמת את זהותך.",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "הייתה בעיה באימות קוד האימות שלך.",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "קוד אימות",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "יש לך דואר",
+    "description": "Header for verify screen"
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "للوصول إلى رمز المصادقة الخاص بك، أنشئ حسابًا وسجّل الدخول إلى {link}ur.io{/link}. بعد تسجيل الدخول، انسخ رمز المصادقة واستخدمه لتسجيل الدخول إلى الامتداد.",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "رمز المصادقة غير صالح أو منتهي الصلاحية. يرجى تسجيل الدخول إلى ur.io للحصول على رمز صالح.",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "رمز المصادقة",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "أدخل رمز المصادقة لمرة واحدة",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "رجوع",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "أفضل مزود متاح",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "أفضل النتائج المطابقة",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "المدن",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "اتصل",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "متابعة",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "الدول",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "الأجهزة",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "افصل",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "لم تره؟",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "هل نسيت كلمة المرور؟",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "ابدأ",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "من الجميل رؤيتك مرة أخرى",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "انضم إلى URnetwork",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "إطلاق",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "يجب أن تتكون أسماء الشبكات من 6 أحرف أو أكثر",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "اسم الشبكة",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "اسم شبكتك",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "اسم الشبكة هذا مستخدم بالفعل",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "كلمة المرور",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "يجب أن تتكون كلمة المرور من 12 حرفًا على الأقل",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "مُروَّج",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "المناطق",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "إعادة إرسال الرمز",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "إعادة التعيين",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "إعادة المحاولة",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "ابحث عن مزودين",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "ابحث عن دول أو ولايات أو مدن...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "حدث خطأ ما",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "ابق خاصًا ومجهول الهوية تمامًا",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "أوافق على {terms_start}الشروط والخدمات{terms_end} و{privacy_start}سياسة الخصوصية{privacy_end} الخاصة بـ URnetwork",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "البريد الإلكتروني أو رقم الهاتف",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "أدخل بريدك الإلكتروني أو رقم هاتفك",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "أخبرنا من أنت حقًا. أدخل الرمز الذي أرسلناه لك للتحقق من هويتك.",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "حدثت مشكلة في التحقق من رمز التحقق الخاص بك.",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "رمز التحقق",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "لديك رسالة",
+    "description": "Header for verify screen"
+  }
+}

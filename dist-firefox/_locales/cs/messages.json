@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "Pro přístup ke svému ověřovacímu kódu si vytvořte účet a přihlaste se na {link}ur.io{/link}. Po přihlášení zkopírujte ověřovací kód a použijte jej k přihlášení do rozšíření.",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "Autentizační kód je neplatný nebo vypršel. Přihlaste se prosím na ur.io a získejte platný kód.",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "Autentizační kód",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "Zadejte svůj jednorázový autentizační kód",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "Zpět",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "Nejlepší dostupný poskytovatel",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "Nejlepší shody",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "Města",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "Připojit",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "Pokračovat",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "Země",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "Zařízení",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "Odpojit",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "Nevidíte to?",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "Zapomněli jste heslo?",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "Začít",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "Je hezké vás zase vidět",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "Připojit se k URnetwork",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "Spustit",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "Název sítě musí mít alespoň 6 znaků",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "Název sítě",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "Název vaší sítě",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "Tento název sítě je již obsazen",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "Heslo",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "Heslo musí mít alespoň 12 znaků",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "Propagováno",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "Regiony",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "Znovu odeslat kód",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "Obnovit",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "Zkusit znovu",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "Hledat poskytovatele",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "Hledat země, státy, města...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "Něco se pokazilo",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "Zůstaňte zcela soukromí a anonymní",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "Souhlasím s {terms_start}Podmínkami a službami{terms_end} a {privacy_start}Zásadami ochrany osobních údajů{privacy_end} URnetwork",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "E-mail nebo telefonní číslo",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "Zadejte svůj e-mail nebo telefonní číslo",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "Řekněte nám, kdo skutečně jste. Zadejte kód, který jsme vám poslali, abyste ověřili svou identitu.",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "Vyskytl se problém s ověřením vašeho ověřovacího kódu.",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "Ověřovací kód",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "Máte poštu",
+    "description": "Header for verify screen"
+  }
+}

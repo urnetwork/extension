@@ -1,0 +1,41 @@
+{
+  "../../../../@crx/manifest": {
+    "file": "assets/crx-manifest.js-BPPlz8wi.js",
+    "name": "crx-manifest.js",
+    "src": "../../../../@crx/manifest",
+    "isEntry": true
+  },
+  "_pac-script-CWnxP8TR.js": {
+    "file": "assets/pac-script-CWnxP8TR.js",
+    "name": "pac-script"
+  },
+  "node_modules/@urnetwork/sdk-js/dist/wasm/sdk.wasm": {
+    "file": "assets/sdk-nJkJPjPn.wasm",
+    "src": "node_modules/@urnetwork/sdk-js/dist/wasm/sdk.wasm"
+  },
+  "node_modules/@urnetwork/sdk-js/dist/wasm/wasm_exec.js": {
+    "file": "assets/wasm_exec-Bt7MFzxt.js",
+    "src": "node_modules/@urnetwork/sdk-js/dist/wasm/wasm_exec.js"
+  },
+  "src/background/index.ts": {
+    "file": "assets/index.ts-Xoj7ADK9.js",
+    "name": "index.ts",
+    "src": "src/background/index.ts",
+    "isEntry": true,
+    "imports": [
+      "_pac-script-CWnxP8TR.js"
+    ]
+  },
+  "src/popup/index.html": {
+    "file": "assets/index.html-DmLuxn-B.js",
+    "name": "index.html",
+    "src": "src/popup/index.html",
+    "isEntry": true,
+    "imports": [
+      "_pac-script-CWnxP8TR.js"
+    ],
+    "css": [
+      "assets/index-DWeOiRFB.css"
+    ]
+  }
+}

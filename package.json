@@ -1,7 +1,7 @@
 {
 	"name": "@urnetwork/extension",
 	"private": true,
-	"version": "0.0.3",
+	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
 		"clean": "rm -rf dist",
@@ -13,7 +13,8 @@
 		"preview": "vite preview",
 		"version:patch": "npm version patch",
 		"version:minor": "npm version minor",
-		"version:major": "npm version major"
+		"version:major": "npm version major",
+		"build:firefox": "rm -rf dist-firefox && node scripts/build-locales.js && tsc -b && BROWSER_TARGET=firefox vite build && node scripts/patch-firefox-build.js"
 	},
 	"dependencies": {
 		"@crxjs/vite-plugin": "^2.3.0",

@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "Để truy cập mã xác thực, hãy tạo tài khoản và đăng nhập vào {link}ur.io{/link}. Sau khi đăng nhập, sao chép mã xác thực và sử dụng nó để đăng nhập vào tiện ích mở rộng.",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "Mã xác thực không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập vào ur.io để lấy mã hợp lệ.",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "Mã xác thực",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "Nhập mã xác thực một lần của bạn",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "Quay lại",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "Nhà cung cấp tốt nhất hiện có",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "Kết quả phù hợp nhất",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "Thành phố",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "Kết nối",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "Tiếp tục",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "Quốc gia",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "Thiết bị",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "Ngắt kết nối",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "Không thấy sao?",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "Quên mật khẩu?",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "Bắt đầu",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "Thật vui được gặp lại bạn",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "Tham gia URnetwork",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "Khởi động",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "Tên mạng phải có từ 6 ký tự trở lên",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "Tên mạng",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "Tên mạng của bạn",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "Tên mạng này đã được sử dụng",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "Mật khẩu",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "Mật khẩu phải có ít nhất 12 ký tự",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "Được quảng bá",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "Khu vực",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "Gửi lại mã",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "Đặt lại",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "Thử lại",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "Tìm nhà cung cấp",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "Tìm kiếm quốc gia, bang, thành phố...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "Đã xảy ra sự cố",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "Giữ hoàn toàn riêng tư và ẩn danh",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "Tôi đồng ý với {terms_start}Điều khoản và Dịch vụ{terms_end} và {privacy_start}Chính sách Bảo mật{privacy_end} của URnetwork",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "Email hoặc số điện thoại",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "Nhập email hoặc số điện thoại của bạn",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "Hãy cho chúng tôi biết bạn là ai. Nhập mã chúng tôi đã gửi để xác minh danh tính của bạn.",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "Đã xảy ra sự cố khi xác thực mã xác minh của bạn.",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "Mã xác minh",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "Bạn có thư",
+    "description": "Header for verify screen"
+  }
+}

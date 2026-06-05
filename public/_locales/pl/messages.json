@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "Aby uzyskać dostęp do swojego kodu uwierzytelniającego, utwórz konto i zaloguj się na {link}ur.io{/link}. Po zalogowaniu skopiuj kod uwierzytelniający i użyj go do zalogowania się w rozszerzeniu.",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "Kod uwierzytelniający jest nieprawidłowy lub wygasł. Zaloguj się na ur.io, aby uzyskać ważny kod.",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "Kod uwierzytelniający",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "Wpisz swój jednorazowy kod uwierzytelniający",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "Wstecz",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "Najlepszy dostępny dostawca",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "Najlepsze dopasowania",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "Miasta",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "Połącz",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "Kontynuuj",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "Kraje",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "Urządzenia",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "Odłącz",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "Nie widzisz tego?",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "Zapomniałeś hasła?",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "Zacznij",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "Miło cię znowu widzieć",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "Dołącz do URnetwork",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "Uruchom",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "Nazwy sieci muszą mieć co najmniej 6 znaków",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "Nazwa sieci",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "Nazwa twojej sieci",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "Ta nazwa sieci jest już zajęta",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "Hasło",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "Hasło musi mieć co najmniej 12 znaków",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "Promowane",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "Regiony",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "Wyślij kod ponownie",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "Zresetuj",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "Spróbuj ponownie",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "Szukaj dostawców",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "Szukaj krajów, stanów, miast...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "Coś poszło nie tak",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "Pozostań całkowicie prywatny i anonimowy",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "Zgadzam się z {terms_start}Warunkami i Usługami{terms_end} oraz {privacy_start}Polityką Prywatności{privacy_end} URnetwork",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "E-mail lub numer telefonu",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "Wprowadź swój e-mail lub numer telefonu",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "Powiedz nam, kim naprawdę jesteś. Wprowadź kod, który wysłaliśmy, aby zweryfikować swoją tożsamość.",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "Wystąpił problem z uwierzytelnieniem twojego kodu weryfikacyjnego.",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "Kod weryfikacyjny",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "Masz wiadomość",
+    "description": "Header for verify screen"
+  }
+}

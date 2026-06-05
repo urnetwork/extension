@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "अपने ऑथ कोड तक पहुंचने के लिए, एक खाता बनाएं और {link}ur.io{/link} में साइन इन करें। साइन इन करने के बाद, एक ऑथ कोड कॉपी करें और उसे एक्सटेंशन में लॉगिन करने के लिए उपयोग करें।",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "ऑथ कोड अमान्य या समाप्त हो गया है। कृपया मान्य ऑथ कोड प्राप्त करने के लिए ur.io में लॉगिन करें।",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "प्रमाणीकरण कोड",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "अपना एक-बार का प्रमाणीकरण कोड दर्ज करें",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "वापस",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "सर्वश्रेष्ठ उपलब्ध प्रदाता",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "सर्वश्रेष्ठ मेल",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "शहर",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "कनेक्ट करें",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "जारी रखें",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "देश",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "डिवाइस",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "डिस्कनेक्ट करें",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "नज़र नहीं आ रहा?",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "क्या आप पासवर्ड भूल गए?",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "शुरू करें",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "आपको फिर से देखकर अच्छा लगा",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "URnetwork में शामिल हों",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "लॉन्च करें",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "नेटवर्क नाम कम से कम 6 अक्षर के होने चाहिए",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "नेटवर्क का नाम",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "आपके नेटवर्क का नाम",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "यह नेटवर्क नाम पहले से लिया जा चुका है",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "पासवर्ड",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "पासवर्ड कम से कम 12 अक्षरों का होना चाहिए",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "प्रमोटेड",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "क्षेत्र",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "कोड फिर से भेजें",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "रीसेट करें",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "पुनः प्रयास करें",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "प्रदाता खोजें",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "देश, राज्य, शहर खोजें...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "कुछ गलत हो गया",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "पूरी तरह से निजी और गुमनाम रहें",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "मैं URnetwork की {terms_start}शर्तें और सेवाएं{terms_end} और {privacy_start}गोपनीयता नीति{privacy_end} से सहमत हूं",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "ईमेल या फ़ोन नंबर",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "अपना ईमेल या फ़ोन नंबर दर्ज करें",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "हमें बताएं कि आप वास्तव में कौन हैं। अपनी पहचान सत्यापित करने के लिए हमने जो कोड भेजा है उसे दर्ज करें।",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "आपके सत्यापन कोड को प्रमाणित करने में समस्या हुई।",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "सत्यापन कोड",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "आपको मेल मिला है",
+    "description": "Header for verify screen"
+  }
+}

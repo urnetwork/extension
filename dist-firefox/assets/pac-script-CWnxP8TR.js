@@ -1,0 +1,5 @@
+const s=["localhost","127.0.0.1","api.bringyour.com"],e=[".local"];function l(t){if(s.includes(t))return!0;for(const o of e)if(t.endsWith(o))return!0;return!1}function u(){return['if (host === "localhost" || host === "127.0.0.1" || isInNet(host, "127.0.0.0", "255.0.0.0")) return "DIRECT";','if (host === "api.bringyour.com") return "DIRECT";','if (shExpMatch(host, "*.local")) return "DIRECT";'].join(`
+  `)}const f=["localhost","127.0.0.1","<local>","api.bringyour.com"],n="kill_switch_enabled";async function h(){const o=(await chrome.storage.local.get(n))[n];return o===void 0?!0:!!o}async function p(t){await chrome.storage.local.set({[n]:t})}function S(t,o={}){const{killSwitch:r=!0}=o;if(t.length===0)return r?'function FindProxyForURL() { return "PROXY 0.0.0.0:1"; }':'function FindProxyForURL() { return "DIRECT"; }';const c=t.map(i=>`HTTPS ${i.host}:${i.port}`).join("; "),a=r?"":"; DIRECT";return`function FindProxyForURL(url, host) {
+  ${u()}
+  return "${c}${a}";
+}`}function d(t){return"data:application/x-ns-proxy-autoconfig;base64,"+btoa(unescape(encodeURIComponent(t)))}export{f as C,p as a,S as b,h as g,d as p,l as s};

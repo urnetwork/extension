@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "認証コードにアクセスするには、アカウントを作成して{link}ur.io{/link}にサインインしてください。サインイン後、認証コードをコピーして拡張機能にログインする際に使用してください。",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "認証コードが無効または期限切れです。有効な認証コードを取得するにはur.ioにログインしてください。",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "認証コード",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "ワンタイム認証コードを入力してください",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "戻る",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "最適な利用可能プロバイダー",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "最適な一致",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "都市",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "接続",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "続行",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "国",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "デバイス",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "切断",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "届いていませんか？",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "パスワードをお忘れですか？",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "開始する",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "またお会いできて嬉しいです",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "URnetworkに参加",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "起動",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "ネットワーク名は6文字以上である必要があります",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "ネットワーク名",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "あなたのネットワーク名",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "このネットワーク名は既に使われています",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "パスワード",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "パスワードは12文字以上である必要があります",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "プロモート",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "地域",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "コードを再送する",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "リセット",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "再試行",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "プロバイダーを検索",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "国、州、都市を検索...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "問題が発生しました",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "完全にプライベートかつ匿名でいましょう",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "URnetworkの{terms_start}利用規約{terms_end}と{privacy_start}プライバシーポリシー{privacy_end}に同意します",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "メールアドレスまたは電話番号",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "メールアドレスまたは電話番号を入力してください",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "あなたが本当に誰なのか教えてください。本人確認のために送信したコードを入力してください。",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "認証コードの認証に問題が発生しました。",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "認証コード",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "メールが届いています",
+    "description": "Header for verify screen"
+  }
+}

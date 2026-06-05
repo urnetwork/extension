@@ -1,0 +1,319 @@
+name: Build and Publish Extension Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to build, for example 0.1.0 or 0.3.0"
+        required: true
+        type: string
+      create_github_release:
+        description: "Create a GitHub Release and upload zip artifacts"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    name: Build release on VPS
+    runs-on: ubuntu-latest
+
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      VPS_PROJECT_DIR: /root/projects/urnetwork-extension
+      VPS_RELEASE_TMP: /root/urnetwork-extension-release-${{ github.run_id }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate version input
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: ${RELEASE_VERSION}"
+            echo "Use semantic format like 0.1.0 or 0.3.0"
+            exit 1
+          fi
+
+          echo "Release version: ${RELEASE_VERSION}"
+
+      - name: Ensure tag does not already exist
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="v${RELEASE_VERSION}"
+
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists locally."
+            exit 1
+          fi
+
+          if git ls-remote --tags origin "${TAG}" | grep -q "refs/tags/${TAG}$"; then
+            echo "Tag ${TAG} already exists on origin."
+            exit 1
+          fi
+
+      - name: Setup SSH for VPS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+
+          ssh-keyscan -p "${{ secrets.VPS_PORT || 22 }}" "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Pull private repo on VPS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/vps_key \
+            -p "${{ secrets.VPS_PORT || 22 }}" \
+            "${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}" \
+            "set -euo pipefail
+
+            export DEBIAN_FRONTEND=noninteractive
+
+            if ! command -v git >/dev/null 2>&1; then
+              apt-get update
+              apt-get install -y git curl ca-certificates unzip
+            fi
+
+            if ! command -v node >/dev/null 2>&1; then
+              curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+              apt-get install -y nodejs
+            fi
+
+            mkdir -p /root/projects
+
+            if [ -d '${VPS_PROJECT_DIR}/.git' ]; then
+              cd '${VPS_PROJECT_DIR}'
+              git fetch origin main --tags
+              git reset --hard origin/main
+            else
+              git clone git@github.com:${{ github.repository }}.git '${VPS_PROJECT_DIR}'
+              cd '${VPS_PROJECT_DIR}'
+            fi
+
+            git status --short
+            node --version
+            npm --version
+            "
+
+      - name: Set release version and build on VPS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/vps_key \
+            -p "${{ secrets.VPS_PORT || 22 }}" \
+            "${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}" \
+            "set -euo pipefail
+
+            cd '${VPS_PROJECT_DIR}'
+
+            echo 'Setting package version to ${RELEASE_VERSION}'
+            npm version '${RELEASE_VERSION}' --no-git-tag-version --allow-same-version
+
+            echo 'Checking manifest config before build'
+            if [ -f manifest.config.ts ]; then
+              grep -n \"version\" manifest.config.ts || true
+            fi
+
+            echo 'Installing dependencies'
+            npm ci
+
+            echo 'Building Chrome release'
+            npm run build
+
+            echo 'Building Firefox release'
+            npm run build:firefox
+
+            mkdir -p '${VPS_RELEASE_TMP}'
+
+            EXPECTED_CHROME_ZIP='release/crx-@urnetwork-extension-${RELEASE_VERSION}.zip'
+            EXPECTED_FIREFOX_ZIP='release/crx-@urnetwork-extension-${RELEASE_VERSION}-firefox.zip'
+
+            if [ ! -f \"\$EXPECTED_CHROME_ZIP\" ]; then
+              echo \"Expected Chrome zip was not generated: \$EXPECTED_CHROME_ZIP\"
+              echo 'Trying to find generated Chrome zip and rename it...'
+
+              GENERATED_CHROME_ZIP=\$(find release -maxdepth 1 -type f \
+                -name 'crx-@urnetwork-extension-*.zip' \
+                ! -name '*firefox.zip' \
+                | sort \
+                | tail -1)
+
+              if [ -z \"\$GENERATED_CHROME_ZIP\" ]; then
+                echo 'No generated Chrome zip found.'
+                exit 1
+              fi
+
+              cp \"\$GENERATED_CHROME_ZIP\" \"\$EXPECTED_CHROME_ZIP\"
+            fi
+
+            if [ ! -f \"\$EXPECTED_FIREFOX_ZIP\" ]; then
+              echo \"Expected Firefox zip was not generated: \$EXPECTED_FIREFOX_ZIP\"
+              echo 'Trying to find generated Firefox zip and rename it...'
+
+              GENERATED_FIREFOX_ZIP=\$(find release -maxdepth 1 -type f \
+                -name 'crx-@urnetwork-extension-*-firefox.zip' \
+                | sort \
+                | tail -1)
+
+              if [ -z \"\$GENERATED_FIREFOX_ZIP\" ]; then
+                echo 'No generated Firefox zip found.'
+                exit 1
+              fi
+
+              cp \"\$GENERATED_FIREFOX_ZIP\" \"\$EXPECTED_FIREFOX_ZIP\"
+            fi
+
+            cp \"\$EXPECTED_CHROME_ZIP\" '${VPS_RELEASE_TMP}/'
+            cp \"\$EXPECTED_FIREFOX_ZIP\" '${VPS_RELEASE_TMP}/'
+
+            echo 'Built release artifacts:'
+            ls -lh '${VPS_RELEASE_TMP}'
+            "
+
+      - name: Download built release artifacts from VPS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p release
+
+          scp -i ~/.ssh/vps_key \
+            -P "${{ secrets.VPS_PORT || 22 }}" \
+            "${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}:${VPS_RELEASE_TMP}/crx-@urnetwork-extension-${RELEASE_VERSION}.zip" \
+            "release/crx-@urnetwork-extension-${RELEASE_VERSION}.zip"
+
+          scp -i ~/.ssh/vps_key \
+            -P "${{ secrets.VPS_PORT || 22 }}" \
+            "${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}:${VPS_RELEASE_TMP}/crx-@urnetwork-extension-${RELEASE_VERSION}-firefox.zip" \
+            "release/crx-@urnetwork-extension-${RELEASE_VERSION}-firefox.zip"
+
+          ls -lh release/*"${RELEASE_VERSION}"*.zip
+
+      - name: Verify downloaded zip artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CHROME_ZIP="release/crx-@urnetwork-extension-${RELEASE_VERSION}.zip"
+          FIREFOX_ZIP="release/crx-@urnetwork-extension-${RELEASE_VERSION}-firefox.zip"
+
+          test -s "${CHROME_ZIP}"
+          test -s "${FIREFOX_ZIP}"
+
+          unzip -t "${CHROME_ZIP}"
+          unzip -t "${FIREFOX_ZIP}"
+
+          unzip -p "${CHROME_ZIP}" manifest.json > /tmp/chrome-manifest.json
+          unzip -p "${FIREFOX_ZIP}" manifest.json > /tmp/firefox-manifest.json
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          expected = os.environ["RELEASE_VERSION"]
+
+          with open("/tmp/chrome-manifest.json", "r", encoding="utf-8") as handle:
+              chrome_manifest = json.load(handle)
+
+          with open("/tmp/firefox-manifest.json", "r", encoding="utf-8") as handle:
+              firefox_manifest = json.load(handle)
+
+          chrome_version = chrome_manifest.get("version")
+          firefox_version = firefox_manifest.get("version")
+
+          print("Expected version:", expected)
+          print("Chrome manifest version:", chrome_version)
+          print("Firefox manifest version:", firefox_version)
+
+          if chrome_version != expected:
+              raise SystemExit("Chrome manifest version mismatch")
+
+          if firefox_version != expected:
+              raise SystemExit("Firefox manifest version mismatch")
+
+          print("Manifest verification passed.")
+          PY
+
+      - name: Commit release artifacts to repository
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "release/crx-@urnetwork-extension-${RELEASE_VERSION}.zip"
+          git add "release/crx-@urnetwork-extension-${RELEASE_VERSION}-firefox.zip"
+
+          if git diff --cached --quiet; then
+            echo "No release artifact changes to commit."
+          else
+            git commit -m "Build release artifacts for v${RELEASE_VERSION}"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+
+      - name: Create and push git tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="v${RELEASE_VERSION}"
+
+          git fetch origin ${{ github.ref_name }}
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+
+      - name: Create GitHub Release
+        if: ${{ inputs.create_github_release }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: v${{ inputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            release/crx-@urnetwork-extension-${{ inputs.version }}.zip
+            release/crx-@urnetwork-extension-${{ inputs.version }}-firefox.zip
+          body: |
+            Release v${{ inputs.version }}
+
+            Built and verified on the configured VPS.
+
+            Artifacts:
+            - Chrome extension zip
+            - Firefox extension zip
+
+      - name: Cleanup VPS temporary files
+        if: always()
+        shell: bash
+        run: |
+          set +e
+
+          ssh -i ~/.ssh/vps_key \
+            -p "${{ secrets.VPS_PORT || 22 }}" \
+            "${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}" \
+            "rm -rf '${VPS_RELEASE_TMP}'"

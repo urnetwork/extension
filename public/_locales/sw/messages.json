@@ -1,0 +1,166 @@
+{
+  "access_auth_code_instructions": {
+    "message": "Ili kupata nambari yako ya uthibitishaji, tengeneza akaunti na uingie kwenye {link}ur.io{/link}. Ukishaingia, nakili nambari ya uthibitishaji na uitumie kuingia kwenye kiendelezi.",
+    "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
+  },
+  "auth_code_input_invalid": {
+    "message": "Nambari ya uthibitishaji si sahihi au imeisha muda. Tafadhali ingia kwenye ur.io ili kupata nambari halali.",
+    "description": "Invalid auth code input error message"
+  },
+  "auth_code_input_label": {
+    "message": "Nambari ya uthibitishaji",
+    "description": "Auth code input label"
+  },
+  "auth_code_input_placeholder": {
+    "message": "Ingiza nambari yako ya uthibitishaji ya mara moja",
+    "description": "Placeholder text for the authentication code input field"
+  },
+  "back": {
+    "message": "Rudi",
+    "description": "\tButton text for going back to the previous screen.\n"
+  },
+  "best_available_provider": {
+    "message": "Mtoa huduma bora anayepatikana",
+    "description": "VPN providers list option to select the best available provider"
+  },
+  "best_matches": {
+    "message": "Mechi bora",
+    "description": "Label for a list or section showing the best matching results."
+  },
+  "cities": {
+    "message": "Miji",
+    "description": "Provider list group title for cities"
+  },
+  "connect": {
+    "message": "Unganisha",
+    "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue": {
+    "message": "Endelea",
+    "description": "Continue button label."
+  },
+  "countries": {
+    "message": "Nchi",
+    "description": "Provider list group title for countries"
+  },
+  "devices": {
+    "message": "Vifaa",
+    "description": "Provider list group title for devices"
+  },
+  "disconnect": {
+    "message": "Katisha",
+    "description": "Disconnect VPN button text"
+  },
+  "dont_see_it": {
+    "message": "Hauioni?",
+    "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_your_password": {
+    "message": "Umesahau nenosiri lako?",
+    "description": "Forgot your password?"
+  },
+  "get_started": {
+    "message": "Anza",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+  },
+  "its_nice_to_see_you_again": {
+    "message": "Ni vizuri kukuona tena",
+    "description": "\tGreeting text on Enter user auth password screen.\n"
+  },
+  "join_urnetwork": {
+    "message": "Jiunge na URnetwork",
+    "description": "Join URnetwork title on the Create Network screen"
+  },
+  "launch": {
+    "message": "Anzisha",
+    "description": "Button text for entering the one-time authentication code and entering the app"
+  },
+  "network_name_input_hint": {
+    "message": "Majina ya mtandao lazima yawe na angalau herufi 6",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_label": {
+    "message": "Jina la mtandao",
+    "description": "Label for the network name input field"
+  },
+  "network_name_input_placeholder": {
+    "message": "Jina la mtandao wako",
+    "description": "Placeholder text for the network name input field."
+  },
+  "network_name_taken": {
+    "message": "Jina hili la mtandao tayari limetumika",
+    "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password": {
+    "message": "Nenosiri",
+    "description": "Label for the password input field."
+  },
+  "password_input_length_hint": {
+    "message": "Nenosiri lazima liwe na angalau herufi 12",
+    "description": "Hint for password input length requirements."
+  },
+  "promoted": {
+    "message": "Imepandishwa",
+    "description": "VPN providers list option for promoted providers"
+  },
+  "regions": {
+    "message": "Kanda",
+    "description": "Provider list group title for regions"
+  },
+  "resend_code": {
+    "message": "Tuma tena msimbo",
+    "description": "Button text to resend the verification code"
+  },
+  "reset_it": {
+    "message": "Weka upya",
+    "description": "Button text for resetting password"
+  },
+  "retry": {
+    "message": "Jaribu tena",
+    "description": "Retry action label"
+  },
+  "search_providers_input_label": {
+    "message": "Tafuta watoa huduma",
+    "description": "Search providers input label"
+  },
+  "search_providers_input_placeholder": {
+    "message": "Tafuta nchi, majimbo, miji...",
+    "description": "Search providers input placeholder text"
+  },
+  "something_went_wrong": {
+    "message": "Kuna tatizo fulani",
+    "description": "Something went wrong error message"
+  },
+  "stay_completely_private_and_anonymous": {
+    "message": "Kaa faragha kabisa na bila kujulikana",
+    "description": "Used as a headline in the Initial Auth carousel.\n"
+  },
+  "terms_checkbox": {
+    "message": "Nakubali {terms_start}Vigezo na Huduma{terms_end} na {privacy_start}Sera ya Faragha{privacy_end} ya URnetwork",
+    "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "user_auth_input_label": {
+    "message": "Barua pepe au nambari ya simu",
+    "description": "Label for the user authentication input field.\n"
+  },
+  "user_auth_input_placeholder": {
+    "message": "Weka barua pepe yako au nambari ya simu",
+    "description": "Placeholder text for the user authentication input field.\n"
+  },
+  "verify_explanation": {
+    "message": "Tuambie wewe ni nani hasa. Ingiza msimbo tuliokutumia kuthibitisha utambulisho wako.",
+    "description": "Sub header text explaining why verification is needed."
+  },
+  "verify_input_invalid": {
+    "message": "Kulikuwa na tatizo katika kuthibitisha nambari yako ya uthibitisho.",
+    "description": "Error message shown when the verification code input is invalid."
+  },
+  "verify_input_label": {
+    "message": "Nambari ya uthibitisho",
+    "description": "Label for the verification code input field"
+  },
+  "verify_screen_header": {
+    "message": "Umepewa barua",
+    "description": "Header for verify screen"
+  }
+}

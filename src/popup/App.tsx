@@ -11,7 +11,7 @@ export default function App() {
 	return (
 		<MemoryRouter>
 			<URNetworkAPIProvider>
-				<AuthProvider storage={chromeStorageAdapter} onAuthChange={() => null}>
+				<AuthProvider storage={chromeStorageAdapter} onAuthChange={() => {}}>
 					<AppRoutes />
 				</AuthProvider>
 			</URNetworkAPIProvider>

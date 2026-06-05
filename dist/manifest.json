@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "URnetwork",
+  "version": "0.1.0",
+  "default_locale": "en",
+  "icons": {
+    "16": "logo.png",
+    "32": "logo.png",
+    "48": "logo.png",
+    "128": "logo.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "logo.png",
+      "32": "logo.png",
+      "48": "logo.png",
+      "128": "logo.png"
+    },
+    "default_popup": "src/popup/index.html"
+  },
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  },
+  "permissions": [
+    "proxy",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://api.bringyour.com/*",
+    "https://api-v4.bringyour.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "wasm/sdk.wasm",
+        "wasm/wasm_exec.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "**/*",
+        "*"
+      ],
+      "use_dynamic_url": false
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://ur.io/*",
+      "https://app.ur.network/*"
+    ]
+  }
+}
