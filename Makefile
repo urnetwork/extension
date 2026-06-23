@@ -6,3 +6,4 @@ clean:
 build:
 	npm ci
 	npm run build
+	npm run build:firefox
