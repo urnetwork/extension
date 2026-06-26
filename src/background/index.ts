@@ -2,6 +2,7 @@ import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
 import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "../utils/pac-script";
 import { runHealthCheck, getSortedSlots, getStoredHealth } from "../utils/node-health";
 import { getKillSwitch, setKillSwitch } from "../utils/kill-switch";
+import { isSsoCompleteUrl, parseSsoCompleteUrl, retrieveAndValidateState, clearSsoState } from "../utils/sso";
 
 const ALLOWED_ORIGINS = ["ur.io", "ur.network", "localhost"];
 const HEALTH_ALARM_NAME = "node-health-check";
@@ -28,6 +29,7 @@ const firefoxProxy = (globalThis as any).browser?.proxy;
 if (firefoxProxy?.onError) {
 	firefoxProxy.onError.addListener((error: { message: string }) => {
 		console.error("Firefox proxy error:", error.message);
+		triggerEarlyHealthCheck();
 	});
 }
 
@@ -43,6 +45,20 @@ if (!isFirefox() && chrome.proxy?.onProxyError) {
 
 async function performHealthCheck(): Promise<void> {
 	const state = proxyManager.getState();
+
+	// Firefox defensive check: if storage says we should be connected but the
+	// onRequest listener is no longer active (background was terminated and
+	// restarted), re-run restoreState() to re-register the listener immediately,
+	// then return early. The next alarm tick (up to 1 minute) will run the full
+	// health-check pass with fresh in-memory state.
+	if (isFirefox() && !proxyManager.isListenerActive()) {
+		const stored = await chrome.storage.local.get("proxy_enabled");
+		if (stored["proxy_enabled"]) {
+			await proxyManager.restoreState();
+			return;
+		}
+	}
+
 	if (!state.enabled || state.mode !== "pac") return;
 
 	const result = await chrome.storage.local.get(MULTI_IP_SLOTS_KEY);
@@ -96,11 +112,65 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 
-setTimeout(() => {
+// Firefox: restore proxy listener immediately — no need to wait for Chrome's
+// proxy.settings.get() to settle. The 2-second delay only benefits Chrome.
+if ((globalThis as any).browser?.proxy?.onRequest) {
 	proxyManager.restoreState().catch((err) => {
-		console.error("Failed to restore proxy state on startup:", err);
+		console.error("Failed to restore Firefox proxy state on startup:", err);
 	});
-}, 2_000);
+} else {
+	setTimeout(() => {
+		proxyManager.restoreState().catch((err) => {
+			console.error("Failed to restore proxy state on startup:", err);
+		});
+	}, 2_000);
+}
+
+// ── SSO tab listener ─────────────────────────────────────────────────────────
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
+	const url = changeInfo.url;
+	if (!url || !isSsoCompleteUrl(url)) return;
+
+	const parsed = parseSsoCompleteUrl(url);
+	if (!parsed) return;
+
+	(async () => {
+		const valid = await retrieveAndValidateState(parsed.state);
+		if (!valid) {
+			console.warn("SSO state mismatch or expired, ignoring callback");
+			return;
+		}
+
+		await clearSsoState();
+
+		const response = await fetch("https://api.bringyour.com/auth/code-login", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ auth_code: parsed.code }),
+		});
+
+		if (!response.ok) {
+			console.error("SSO code-login failed:", response.status);
+			return;
+		}
+
+		const result = await response.json();
+		const jwt = result.by_jwt;
+		if (!jwt) {
+			console.error("SSO code-login returned no JWT");
+			return;
+		}
+
+		await chrome.storage.local.set({ by_jwt: jwt });
+
+		chrome.runtime
+			.sendMessage({ type: "JWT_RECEIVED", jwt })
+			.catch(() => {});
+
+		chrome.tabs.remove(tabId).catch(() => {});
+	})();
+});
 
 // ── External messages ─────────────────────────────────────────────────────────
 

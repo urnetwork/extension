@@ -12,6 +12,9 @@ const isFirefox = process.env.BROWSER_TARGET === "firefox";
 const outDir = isFirefox ? "dist-firefox" : "dist";
 
 export default defineConfig({
+	define: {
+		__EXTENSION_VERSION__: JSON.stringify(version),
+	},
 	build: {
 		outDir,
 	},

@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthNetworkClient, useRemoveNetworkClient } from "@urnetwork/sdk-js/react";
-import { ConnectionManager, type ConnectionMode, type ConnectionStatus } from "./connection-manager";
+import { ConnectionManager, type ConnectionStatus } from "./connection-manager";
 import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
-import type { ProxyConfig } from "./proxy-manager";
 
 interface UseConnectionManagerResult {
 	status: ConnectionStatus;
 	error: string | null;
-	connect: (location?: ConnectLocation, mode?: ConnectionMode) => Promise<void>;
+	connect: (location?: ConnectLocation) => Promise<void>;
 	disconnect: () => Promise<void>;
-	reattach: (location?: ConnectLocation, mode?: ConnectionMode) => void;
-	onProxyChange: (cb: (config: ProxyConfig | null) => void) => void;
+	reattach: (location?: ConnectLocation) => void;
+	onProxyChange: (cb: (config: null) => void) => void;
 }
 
 export function useConnectionManager(): UseConnectionManagerResult {
@@ -20,7 +19,7 @@ export function useConnectionManager(): UseConnectionManagerResult {
 	const [status, setStatus] = useState<ConnectionStatus>("idle");
 	const [error, setError] = useState<string | null>(null);
 
-	const proxyChangeCbRef = useRef<((config: ProxyConfig | null) => void) | null>(null);
+	const proxyChangeCbRef = useRef<((config: null) => void) | null>(null);
 	const managerRef = useRef<ConnectionManager | null>(null);
 
 	const authFnRef = useRef(authNetworkClient);
@@ -53,8 +52,7 @@ export function useConnectionManager(): UseConnectionManagerResult {
 	}, []);
 
 	const connect = useCallback(
-		(location?: ConnectLocation, mode: ConnectionMode = "standard") =>
-			getManager().connect(location, mode),
+		(location?: ConnectLocation) => getManager().connect(location),
 		[getManager],
 	);
 
@@ -67,13 +65,12 @@ export function useConnectionManager(): UseConnectionManagerResult {
 	}, []);
 
 	const reattach = useCallback(
-		(location?: ConnectLocation, mode: ConnectionMode = "standard") =>
-			getManager().reattach(location, mode),
+		(location?: ConnectLocation) => getManager().reattach(location),
 		[getManager],
 	);
 
 	const onProxyChange = useCallback(
-		(cb: (config: ProxyConfig | null) => void) => {
+		(cb: (config: null) => void) => {
 			proxyChangeCbRef.current = cb;
 		},
 		[],

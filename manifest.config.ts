@@ -32,7 +32,7 @@ export default defineManifest({
 			service_worker: "src/background/index.ts",
 			type: "module",
 		},
-	permissions: ["proxy", "storage", "alarms"],
+	permissions: ["proxy", "storage", "alarms", "tabs"],
 	host_permissions: isFirefox
 		? ["<all_urls>", "https://api.bringyour.com/*", "https://api-v4.bringyour.com/*"]
 		: ["https://api.bringyour.com/*", "https://api-v4.bringyour.com/*"],
