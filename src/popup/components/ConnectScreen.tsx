@@ -14,18 +14,15 @@ import {
 	UrSelectedLocation,
 	UrText,
 } from "@urnetwork/elements/react";
-import { useAuth, useProviderList } from "@urnetwork/sdk-js/react";
+import { useAuth } from "@urnetwork/sdk-js/react";
 import { getMessage } from "@/utils/i18n";
 import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
 import { chromeStorageAdapter } from "@/utils/storage-adapter";
 import { fetchIpInfo, type IpInfo } from "@/utils/ip-info";
 import { useConnectionManager } from "@/utils/use-connection-manager";
-import { useConnectionMode } from "@/utils/use-connection-mode";
-import type { ProxyConfig } from "@/utils/proxy-manager";
+import { useProviderListEnhanced, type RegionGroup } from "@/utils/use-provider-list-enhanced";
 
 const STORAGE_KEY_LOCATION = "selected_connect_location";
-
-// ── helpers ──────────────────────────────────────────────────────────────────
 
 function locationKey(location?: ConnectLocation): string {
 	if (!location) return "best-available-provider";
@@ -35,13 +32,10 @@ function locationKey(location?: ConnectLocation): string {
 	return location.name ?? "";
 }
 
-// ── component ─────────────────────────────────────────────────────────────────
-
 export const ConnectScreen: React.FC = () => {
 	const { clearAuth } = useAuth();
 	const { status, error: connectionError, connect, disconnect, reattach, onProxyChange } =
 		useConnectionManager();
-	const { mode, setMode } = useConnectionMode();
 
 	const {
 		query,
@@ -50,9 +44,8 @@ export const ConnectScreen: React.FC = () => {
 		error: loadingLocationsError,
 		loading: locationsLoading,
 		retry,
-	} = useProviderList();
+	} = useProviderListEnhanced();
 
-	const [proxyConfig, setProxyConfig] = useState<ProxyConfig | null>(null);
 	const [selectedLocation, setSelectedLocation] =
 		useState<ConnectLocation | null>(null);
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -72,39 +65,31 @@ export const ConnectScreen: React.FC = () => {
 		chrome.runtime.sendMessage({ type: "SET_KILL_SWITCH", enabled: next });
 	}, [killSwitch]);
 
-	// Register proxy change callback once
 	useEffect(() => {
-		onProxyChange((config) => setProxyConfig(config));
+		onProxyChange(() => {});
 	}, [onProxyChange]);
 
-	// ── IP info banner ────────────────────────────────────────────────────────
-
+	// ── IP info ──────────────────────────────────────────────────────────────
 	const [ipInfo, setIpInfo] = useState<IpInfo | null>(null);
 	const [ipInfoLoading, setIpInfoLoading] = useState(true);
 	const [ipInfoError, setIpInfoError] = useState(false);
 	const ipPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	const statusRef = useRef(status);
-	const proxyConfigRef = useRef(proxyConfig);
 	useEffect(() => { statusRef.current = status; }, [status]);
-	useEffect(() => { proxyConfigRef.current = proxyConfig; }, [proxyConfig]);
 
 	const refreshIpInfo = useCallback(async () => {
 		try {
 			const info = await fetchIpInfo();
 			setIpInfo(info);
 			setIpInfoError(false);
-
-			const currentProxy = proxyConfigRef.current;
-
-			if (currentProxy !== null && info.connectedToNetwork) {
+			const currentlyActive = statusRef.current === "connected" || statusRef.current === "reconnecting" || statusRef.current === "degraded";
+			if (currentlyActive && info.connectedToNetwork) {
 				ipFailCountRef.current = 0;
 				setProxyActiveButUnreachable(false);
-			} else if (currentProxy !== null && !info.connectedToNetwork) {
+			} else if (currentlyActive && !info.connectedToNetwork) {
 				ipFailCountRef.current++;
-				if (ipFailCountRef.current >= 3) {
-					setProxyActiveButUnreachable(true);
-				}
+				if (ipFailCountRef.current >= 3) setProxyActiveButUnreachable(true);
 			} else {
 				ipFailCountRef.current = 0;
 				setProxyActiveButUnreachable(false);
@@ -119,48 +104,38 @@ export const ConnectScreen: React.FC = () => {
 	useEffect(() => {
 		refreshIpInfo();
 		ipPollRef.current = setInterval(refreshIpInfo, 15_000);
-		return () => {
-			if (ipPollRef.current !== null) clearInterval(ipPollRef.current);
-		};
+		return () => { if (ipPollRef.current !== null) clearInterval(ipPollRef.current); };
 	}, [refreshIpInfo]);
 
 	useEffect(() => {
-		if (status === "connected" || status === "idle") {
-			refreshIpInfo();
-		}
+		if (status === "connected" || status === "idle") refreshIpInfo();
 	}, [status, refreshIpInfo]);
 
-	// Auto-retry provider list when it errored and connection reaches a stable state
 	useEffect(() => {
-		if (loadingLocationsError && (status === "connected" || status === "idle")) {
-			retry();
-		}
+		if (loadingLocationsError && (status === "connected" || status === "idle")) retry();
 	}, [status, loadingLocationsError, retry]);
 
-	// Reset unreachable warning when in multi-ip mode (no single proxyConfig but still connected)
 	useEffect(() => {
-		if (status === "connected" && proxyConfig === null) {
+		if (status === "idle") {
 			ipFailCountRef.current = 0;
 			setProxyActiveButUnreachable(false);
 		}
-	}, [status, proxyConfig]);
+	}, [status]);
 
 	// ── load persisted state on mount ────────────────────────────────────────
-
 	useEffect(() => {
 		let cancelled = false;
-
 		async function init() {
 			try {
+				// Clear stale connection_mode key from older versions
+				chrome.storage.local.remove("connection_mode");
+
 				const [vpnResponse, storedLocation] = await Promise.all([
 					chrome.runtime.sendMessage({ type: "GET_VPN_STATE" }),
 					chromeStorageAdapter.getItem(STORAGE_KEY_LOCATION),
 				]);
-
 				if (cancelled) return;
-
 				let restoredLocation: ConnectLocation | null = null;
-
 				if (storedLocation) {
 					try {
 						restoredLocation = JSON.parse(storedLocation);
@@ -169,33 +144,21 @@ export const ConnectScreen: React.FC = () => {
 						await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
 					}
 				}
-
 				if (vpnResponse?.success && vpnResponse.state?.enabled) {
-					const proxyMode = vpnResponse.state.mode ?? "fixed";
-
-					if (proxyMode === "pac") {
-						reattach(restoredLocation ?? undefined, "multi-ip");
-					} else {
-						const config = vpnResponse.state.config ?? null;
-						setProxyConfig(config);
-						reattach(restoredLocation ?? undefined, "standard");
-					}
+					reattach(restoredLocation ?? undefined);
 				}
 			} catch (err) {
 				if (!cancelled) console.error("Failed to load initial state:", err);
 			}
 		}
-
 		init();
 		return () => { cancelled = true; };
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// ── refresh selected location's provider count when list updates ─────────
-
+	// ── refresh selected location provider count ─────────────────────────────
 	useEffect(() => {
 		if (!selectedLocation) return;
-
 		const all: ConnectLocation[] = [
 			...(filteredLocations.best_matches ?? []),
 			...(filteredLocations.countries ?? []),
@@ -204,62 +167,29 @@ export const ConnectScreen: React.FC = () => {
 			...(filteredLocations.promoted ?? []),
 			...(filteredLocations.regions ?? []),
 		];
-
 		const refreshed = all.find(
-			(loc) =>
-				loc.connect_location_id?.location_id ===
-				selectedLocation.connect_location_id?.location_id,
+			(loc) => loc.connect_location_id?.location_id === selectedLocation.connect_location_id?.location_id,
 		);
-
-		if (
-			refreshed &&
-			refreshed.provider_count !== selectedLocation.provider_count
-		) {
+		if (refreshed && refreshed.provider_count !== selectedLocation.provider_count) {
 			setSelectedLocation(refreshed);
 		}
-	}, [filteredLocations]); // intentionally omit selectedLocation to avoid loops
+	}, [filteredLocations]); // eslint-disable-line react-hooks/exhaustive-deps
 
-	// ── connect / disconnect ──────────────────────────────────────────────────
-
+	// ── connect / disconnect ─────────────────────────────────────────────────
 	const handleConnect = useCallback(
-		async (location?: ConnectLocation) => {
-			await connect(location, mode);
-		},
-		[connect, mode],
+		async (location?: ConnectLocation) => { await connect(location); },
+		[connect],
 	);
 
 	const handleDisconnect = useCallback(async () => {
 		await disconnect();
-		setProxyConfig(null);
 	}, [disconnect]);
 
-	// Toggle mode: if currently connected, reconnect in new mode immediately
-	const handleModeToggle = useCallback(async () => {
-		const next = mode === "standard" ? "multi-ip" : "standard";
-		setMode(next);
-
-		const isConnected =
-			status === "connected" ||
-			status === "reconnecting" ||
-			status === "degraded" ||
-			(proxyConfig !== null && status === "idle");
-
-		if (isConnected) {
-			await disconnect();
-			setProxyConfig(null);
-			await connect(selectedLocation ?? undefined, next);
-		}
-	}, [mode, setMode, status, proxyConfig, disconnect, connect, selectedLocation]);
-
 	// ── location selection ────────────────────────────────────────────────────
-
 	const selectLocation = useCallback(
 		async (location: ConnectLocation) => {
 			setSelectedLocation(location);
-			await chromeStorageAdapter.setItem(
-				STORAGE_KEY_LOCATION,
-				JSON.stringify(location),
-			);
+			await chromeStorageAdapter.setItem(STORAGE_KEY_LOCATION, JSON.stringify(location));
 			handleConnect(location);
 		},
 		[handleConnect],
@@ -271,62 +201,56 @@ export const ConnectScreen: React.FC = () => {
 		handleConnect();
 	}, [handleConnect]);
 
-	// ── logout ────────────────────────────────────────────────────────────────
-
+	// ── logout ───────────────────────────────────────────────────────────────
 	const handleLogout = useCallback(async () => {
 		setIsLoggingOut(true);
-		const hasActiveProxy = proxyConfig !== null || status === "connected" || status === "reconnecting" || status === "degraded";
-		if (hasActiveProxy) {
-			await handleDisconnect();
-		}
+		const hasActiveProxy = status === "connected" || status === "reconnecting" || status === "degraded";
+		if (hasActiveProxy) await handleDisconnect();
 		await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
 		clearAuth();
 		setIsLoggingOut(false);
-	}, [proxyConfig, status, handleDisconnect, clearAuth]);
+	}, [status, handleDisconnect, clearAuth]);
 
-	// ── render ────────────────────────────────────────────────────────────────
-
+	// ── render ───────────────────────────────────────────────────────────────
 	if (isLoggingOut) {
 		return (
 			<Screen>
-				<div className="flex w-full justify-center py-ur-2xl">
+				<div className="flex w-full h-full items-center justify-center">
 					<UrIconSpinner />
 				</div>
 			</Screen>
 		);
 	}
 
-	const isActive =
-		status === "connected" ||
-		(proxyConfig !== null && status === "idle");
+	const isActive = status === "connected";
 	const isConnecting = status === "connecting";
 	const isReconnecting = status === "reconnecting" || status === "degraded";
-	const isMultiIp = mode === "multi-ip";
 
 	return (
 		<Screen>
-			{/* ── sticky header ── */}
-			<div className="p-ur-md shrink-0 bg-(--ur-color-black) border-b border-(--ur-color-border) relative z-10">
-				<IpInfoBanner ipInfo={ipInfo} loading={ipInfoLoading} error={ipInfoError} />
+			{/* ── Left Panel: Connection Controls ── */}
+			<div className="w-[280px] shrink-0 h-full flex flex-col" style={{ background: "var(--color-surface-1)" }}>
+				{/* Header with menu */}
+				<div className="flex items-center justify-between px-5 pt-4 pb-2">
+					<span className="text-sm font-semibold tracking-wide opacity-60 uppercase">URnetwork</span>
+					<UrMenu>
+						<UrMenuButton>
+							<UrIconHamburger className="size-5 opacity-60 hover:opacity-100 transition-opacity" />
+						</UrMenuButton>
+						<MenuItem className="text-left" onMenuItemClick={handleLogout}>
+							<UrText>Logout</UrText>
+						</MenuItem>
+					</UrMenu>
+				</div>
 
-				<div className="mb-ur-lg">
-					{/* top bar */}
-					<div className="flex w-full justify-end mb-ur-sm">
-						<UrMenu>
-							<UrMenuButton>
-								<UrIconHamburger className="size-6" />
-							</UrMenuButton>
-							<MenuItem
-								className="text-left"
-								onMenuItemClick={handleLogout}
-							>
-								<UrText>Logout</UrText>
-							</MenuItem>
-						</UrMenu>
-					</div>
+				{/* IP Info */}
+				<div className="px-4 mb-3">
+					<IpInfoBanner ipInfo={ipInfo} loading={ipInfoLoading} error={ipInfoError} />
+				</div>
 
-					{/* selected location indicator */}
-					<div className="mb-ur-sm">
+				{/* Selected location card */}
+				<div className="px-4 mb-3">
+					<div className="rounded-xl p-3" style={{ background: "var(--color-surface-2)" }}>
 						{selectedLocation ? (
 							<UrSelectedLocation
 								key={locationKey(selectedLocation)}
@@ -340,125 +264,41 @@ export const ConnectScreen: React.FC = () => {
 							<UrSelectedLocation locationKey="best-available-provider" />
 						)}
 					</div>
+				</div>
 
-					{/* reconnecting notice */}
-					{isReconnecting && (
-						<div className="flex items-center gap-ur-sm mb-ur-sm">
-							<UrIconSpinner size={0.75} />
-							<UrText variant="small" className="text-(--ur-color-yellow-light)">
-								Reconnecting...
-							</UrText>
-						</div>
-					)}
+				{/* Reconnecting notice */}
+				{isReconnecting && (
+					<div className="flex items-center gap-2 px-4 mb-2">
+						<UrIconSpinner size={0.65} />
+						<span className="text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
+							Reconnecting...
+						</span>
+					</div>
+				)}
 
-					{/* connect / disconnect */}
+				{/* Connect / Disconnect button */}
+				<div className="px-4 mb-4">
 					{isActive || isReconnecting || isConnecting ? (
-						<UrButton
-							onClick={handleDisconnect}
-							loading={false}
-							disabled={false}
-							variant="secondary"
-							fullWidth
-						>
+						<UrButton onClick={handleDisconnect} loading={false} disabled={false} variant="secondary" fullWidth>
 							<UrText>{getMessage("disconnect")}</UrText>
 						</UrButton>
 					) : (
-						<UrButton
-							onClick={() => handleConnect()}
-							loading={isConnecting}
-							disabled={isConnecting}
-							fullWidth
-						>
+						<UrButton onClick={() => handleConnect()} loading={isConnecting} disabled={isConnecting} fullWidth>
 							<UrText>{getMessage("connect")}</UrText>
 						</UrButton>
 					)}
 
-					{/* proxy active but IP check says not on network */}
 					{proxyActiveButUnreachable && !isReconnecting && (
-						<div className="mt-ur-sm">
-							<UrText variant="small" className="text-(--ur-color-yellow-light)">
-								Proxy active but network unreachable. Reconnecting...
-							</UrText>
-						</div>
+						<p className="mt-2 text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
+							Proxy active but network unreachable.
+						</p>
 					)}
 
-					{/* multi-IP mode toggle — always visible */}
-					<div className="mt-ur-sm flex items-center justify-between gap-ur-sm py-ur-sm border-t border-(--ur-color-border)">
-						<div className="flex flex-col gap-0.5 flex-1 min-w-0">
-							<UrText variant="small">Multi-IP Mode</UrText>
-							<UrText variant="small" className="text-(--ur-color-text-secondary) text-xs leading-tight">
-								{isConnecting && isMultiIp
-									? "Provisioning connections..."
-									: isMultiIp
-										? "Each tab uses a separate IP address"
-										: "All tabs share a single IP address"}
-							</UrText>
-						</div>
-						{isConnecting && isMultiIp ? (
-							<div className="shrink-0 flex items-center justify-center w-11 h-6">
-								<UrIconSpinner size={0.65} />
-							</div>
-						) : (
-							<button
-								type="button"
-								onClick={handleModeToggle}
-								disabled={isConnecting}
-								aria-label="Toggle multi-IP mode"
-								style={{
-									backgroundColor: isMultiIp
-										? "var(--ur-color-primary, #22c55e)"
-										: "var(--ur-color-border, #3f3f46)",
-								}}
-								className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-							>
-								<span
-									className={[
-										"pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow",
-										"transform transition duration-200 ease-in-out",
-										isMultiIp ? "translate-x-5" : "translate-x-0",
-									].join(" ")}
-								/>
-							</button>
-						)}
-					</div>
-
-					{/* kill switch toggle */}
-					<div className="mt-ur-sm flex items-center justify-between gap-ur-sm py-ur-sm border-t border-(--ur-color-border)">
-						<div className="flex flex-col gap-0.5 flex-1 min-w-0">
-							<UrText variant="small">Kill Switch</UrText>
-							<UrText variant="small" className="text-(--ur-color-text-secondary) text-xs leading-tight">
-								{killSwitch
-									? "Traffic blocked if all nodes fail"
-									: "Traffic may leak if all nodes fail"}
-							</UrText>
-						</div>
-						<button
-							type="button"
-							onClick={handleKillSwitchToggle}
-							aria-label="Toggle kill switch"
-							style={{
-								backgroundColor: killSwitch
-									? "var(--ur-color-primary, #22c55e)"
-									: "var(--ur-color-border, #3f3f46)",
-							}}
-							className="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-						>
-							<span
-								className={[
-									"pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow",
-									"transform transition duration-200 ease-in-out",
-									killSwitch ? "translate-x-5" : "translate-x-0",
-								].join(" ")}
-							/>
-						</button>
-					</div>
-
-					{/* error feedback */}
 					{status === "error" && connectionError && (
-						<div className="mt-ur-sm flex items-center gap-ur-sm">
-							<UrText variant="small" className="text-ur-coral flex-1">
+						<div className="mt-2 flex items-center gap-2">
+							<span className="text-xs flex-1" style={{ color: "var(--ur-color-coral)" }}>
 								{connectionError}
-							</UrText>
+							</span>
 							<UrButton variant="secondary" onClick={() => handleConnect(selectedLocation ?? undefined)}>
 								<UrText variant="small">{getMessage("retry")}</UrText>
 							</UrButton>
@@ -466,36 +306,75 @@ export const ConnectScreen: React.FC = () => {
 					)}
 				</div>
 
-				<UrInput
-					label={getMessage("search_providers_input_label")}
-					placeholder={getMessage("search_providers_input_placeholder")}
-					value={query}
-					onInput={(e) => setQuery(e.detail.value)}
-				/>
+				{/* Settings toggles */}
+				<div className="px-4 flex-1 flex flex-col gap-2">
+					<div className="rounded-xl p-3 flex flex-col gap-3" style={{ background: "var(--color-surface-2)" }}>
+						{/* Kill switch toggle */}
+						<div className="flex items-center justify-between gap-2">
+							<div className="flex flex-col gap-0.5 flex-1 min-w-0">
+								<span className="text-xs font-medium">Kill Switch</span>
+								<span className="text-[10px] opacity-50 leading-tight">
+									{killSwitch ? "Blocks traffic on failure" : "Traffic may leak on failure"}
+								</span>
+							</div>
+							<ToggleSwitch enabled={killSwitch} onToggle={handleKillSwitchToggle} label="Toggle kill switch" />
+						</div>
+					</div>
+				</div>
+
+				{/* Connection status indicator at bottom */}
+				<div className="px-4 py-3 mt-auto">
+					<div className="flex items-center gap-2">
+						<span
+							className="size-2 rounded-full shrink-0 transition-colors duration-300"
+							style={{
+								backgroundColor: isActive
+									? "var(--ur-color-green, #22c55e)"
+									: isConnecting || isReconnecting
+										? "var(--ur-color-yellow-light, #fbbf24)"
+										: "var(--ur-color-gray, #6b7280)",
+							}}
+						/>
+						<span className="text-[11px] opacity-60">
+							{isActive ? "Connected" : isConnecting ? "Connecting..." : isReconnecting ? "Reconnecting..." : "Disconnected"}
+						</span>
+					</div>
+				</div>
 			</div>
 
-			{/* ── location list ── */}
-			{locationsLoading ? (
-				<div className="flex py-ur-lg justify-center">
-					<UrIconSpinner size={1.2} />
+			{/* ── Right Panel: Location List ── */}
+			<div className="flex-1 h-full flex flex-col" style={{ background: "var(--color-surface-0)" }}>
+				{/* Search header */}
+				<div className="px-4 pt-4 pb-3">
+					<p className="text-center text-xs font-medium opacity-50 mb-2">{getMessage("search_providers_input_label")}</p>
+					<div className="rounded-xl overflow-hidden" style={{ background: "var(--color-surface-2)" }}>
+						<UrInput
+							placeholder="Search countries, cities, regions..."
+							value={query}
+							onInput={(e) => setQuery(e.detail.value)}
+						/>
+					</div>
 				</div>
-			) : loadingLocationsError ? (
-				<div className="flex flex-col items-center justify-center py-ur-lg gap-ur-md">
-					<UrIconNetworkInstability className="text-ur-yellow-light size-ur-lg" />
-					<UrText variant="small" className="text-ur-gray">
-						{getMessage("something_went_wrong")}
-					</UrText>
-					<UrButton variant="secondary" onClick={retry}>
-						<UrText>{getMessage("retry")}</UrText>
-					</UrButton>
-				</div>
-			) : (
-				<div id="locations-list" className="flex-1 overflow-y-auto pb-ur-md">
-					{/* Best available — only shown when search is empty */}
-					{query.length === 0 && (
-						<>
-							<LocationsGroupLabel groupLabel={getMessage("promoted")} />
-							<ul>
+
+				{/* Location list */}
+				{locationsLoading ? (
+					<div className="flex py-8 justify-center">
+						<UrIconSpinner size={1.2} />
+					</div>
+				) : loadingLocationsError ? (
+					<div className="flex flex-col items-center justify-center py-8 gap-3">
+						<UrIconNetworkInstability className="size-8 opacity-60" />
+						<UrText variant="small" className="opacity-60">
+							{getMessage("something_went_wrong")}
+						</UrText>
+						<UrButton variant="secondary" onClick={retry}>
+							<UrText>{getMessage("retry")}</UrText>
+						</UrButton>
+					</div>
+				) : (
+					<div className="flex-1 overflow-y-auto px-4 pb-4">
+						{query.length === 0 && (
+							<LocationsSection label={getMessage("promoted")}>
 								<UrLocationListItem
 									locationKey="best-available-provider"
 									name={getMessage("best_available_provider")}
@@ -503,101 +382,180 @@ export const ConnectScreen: React.FC = () => {
 									strongPrivacy={false}
 									unstable={false}
 								/>
-							</ul>
-						</>
-					)}
+							</LocationsSection>
+						)}
 
-					{filteredLocations.best_matches &&
-						filteredLocations.best_matches.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("best_matches")}
-								locations={filteredLocations.best_matches}
-								onSelect={selectLocation}
+						{filteredLocations.best_matches && filteredLocations.best_matches.length > 0 && (
+							<LocationsSection label={getMessage("best_matches")}>
+								{filteredLocations.best_matches.map((location) => (
+									<UrLocationListItem
+										key={locationKey(location)}
+										locationKey={locationKey(location)}
+										name={location.name}
+										providerCount={location.provider_count}
+										onClick={() => selectLocation(location)}
+										strongPrivacy={location.strong_privacy}
+										unstable={!location.stable}
+									/>
+								))}
+							</LocationsSection>
+						)}
+
+						{filteredLocations.countries && filteredLocations.countries.length > 0 && (
+							<LocationsSection label={getMessage("countries")}>
+								{filteredLocations.countries.map((location) => (
+									<UrLocationListItem
+										key={locationKey(location)}
+										locationKey={locationKey(location)}
+										name={location.name}
+										providerCount={location.provider_count}
+										onClick={() => selectLocation(location)}
+										strongPrivacy={location.strong_privacy}
+										unstable={!location.stable}
+									/>
+								))}
+							</LocationsSection>
+						)}
+
+						{/* Search mode: regions as headers with cities nested */}
+						{filteredLocations.region_groups && filteredLocations.region_groups.length > 0 && (
+							<RegionGroupedList
+								groups={filteredLocations.region_groups}
+								onSelectLocation={selectLocation}
 							/>
 						)}
 
-					{filteredLocations.countries &&
-						filteredLocations.countries.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("countries")}
-								locations={filteredLocations.countries}
-								onSelect={selectLocation}
-							/>
+						{/* Non-search mode: standalone cities and regions */}
+						{!filteredLocations.region_groups && filteredLocations.cities && filteredLocations.cities.length > 0 && (
+							<LocationsSection label={getMessage("cities")}>
+								{filteredLocations.cities.map((location) => (
+									<UrLocationListItem
+										key={locationKey(location)}
+										locationKey={locationKey(location)}
+										name={location.name}
+										providerCount={location.provider_count}
+										onClick={() => selectLocation(location)}
+										strongPrivacy={location.strong_privacy}
+										unstable={!location.stable}
+									/>
+								))}
+							</LocationsSection>
 						)}
 
-					{filteredLocations.cities &&
-						filteredLocations.cities.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("cities")}
-								locations={filteredLocations.cities}
-								onSelect={selectLocation}
-							/>
+						{!filteredLocations.region_groups && filteredLocations.regions && filteredLocations.regions.length > 0 && (
+							<LocationsSection label={getMessage("regions")}>
+								{filteredLocations.regions.map((location) => (
+									<UrLocationListItem
+										key={locationKey(location)}
+										locationKey={locationKey(location)}
+										name={location.name}
+										providerCount={location.provider_count}
+										onClick={() => selectLocation(location)}
+										strongPrivacy={location.strong_privacy}
+										unstable={!location.stable}
+									/>
+								))}
+							</LocationsSection>
 						)}
 
-					{filteredLocations.devices &&
-						filteredLocations.devices.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("devices")}
-								locations={filteredLocations.devices}
-								onSelect={selectLocation}
-							/>
+						{filteredLocations.devices && filteredLocations.devices.length > 0 && (
+							<LocationsSection label={getMessage("devices")}>
+								{filteredLocations.devices.map((location) => (
+									<UrLocationListItem
+										key={locationKey(location)}
+										locationKey={locationKey(location)}
+										name={location.name}
+										providerCount={location.provider_count}
+										onClick={() => selectLocation(location)}
+										strongPrivacy={location.strong_privacy}
+										unstable={!location.stable}
+									/>
+								))}
+							</LocationsSection>
 						)}
-
-					{filteredLocations.regions &&
-						filteredLocations.regions.length > 0 && (
-							<LocationsGroup
-								groupLabel={getMessage("regions")}
-								locations={filteredLocations.regions}
-								onSelect={selectLocation}
-							/>
-						)}
-				</div>
-			)}
+					</div>
+				)}
+			</div>
 		</Screen>
 	);
 };
 
-// ── sub-components ─────────────────────────────────────────────────────────────
+// ── Sub-components ───────────────────────────────────────────────────────────
 
-interface LocationsGroupProps {
-	groupLabel: string;
-	locations: ConnectLocation[];
-	onSelect: (location: ConnectLocation) => void;
-}
-
-export const LocationsGroup: React.FC<LocationsGroupProps> = ({
-	groupLabel,
-	locations,
-	onSelect,
-}) => (
-	<>
-		<LocationsGroupLabel groupLabel={groupLabel} />
-		<ul>
-			{locations.map((location) => (
-				<UrLocationListItem
-					key={locationKey(location)}
-					locationKey={locationKey(location)}
-					name={location.name}
-					providerCount={location.provider_count}
-					onClick={() => onSelect(location)}
-					strongPrivacy={location.strong_privacy}
-					unstable={!location.stable}
-				/>
-			))}
-		</ul>
-	</>
+const LocationsSection: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+	<div className="mb-2">
+		<div className="sticky top-0 z-10 py-2 px-1" style={{ background: "var(--color-surface-0)" }}>
+			<span className="text-[11px] font-semibold uppercase tracking-wider opacity-40">{label}</span>
+		</div>
+		<div className="rounded-xl overflow-hidden" style={{ background: "var(--color-surface-1)" }}>
+			{children}
+		</div>
+	</div>
 );
 
-interface LocationsGroupLabelProps {
-	groupLabel: string;
-}
-
-export const LocationsGroupLabel: React.FC<LocationsGroupLabelProps> = ({
-	groupLabel,
-}) => (
-	<div className="sticky top-0 bg-ur-black z-10 px-ur-md py-ur-sm text-left border-b border-t border-(--ur-color-border) shadow-md">
-		<UrText variant="body">{groupLabel}</UrText>
+const RegionGroupedList: React.FC<{
+	groups: RegionGroup[];
+	onSelectLocation: (location: ConnectLocation) => void;
+}> = ({ groups, onSelectLocation }) => (
+	<div className="mb-2">
+		<div className="sticky top-0 z-10 py-2 px-1" style={{ background: "var(--color-surface-0)" }}>
+			<span className="text-[11px] font-semibold uppercase tracking-wider opacity-40">Regions</span>
+		</div>
+		{groups.map((group) => (
+			<div key={locationKey(group.region)} className="mb-2">
+				{/* Region header */}
+				<div className="rounded-xl overflow-hidden" style={{ background: "var(--color-surface-1)" }}>
+					<UrLocationListItem
+						locationKey={locationKey(group.region)}
+						name={group.region.name}
+						providerCount={group.region.provider_count}
+						onClick={() => onSelectLocation(group.region)}
+						strongPrivacy={group.region.strong_privacy}
+						unstable={!group.region.stable}
+					/>
+				</div>
+				{/* Nested cities */}
+				{group.cities.length > 0 && (
+					<div className="ml-4 mt-1 rounded-xl overflow-hidden" style={{ background: "var(--color-surface-1)" }}>
+						{group.cities.map((city) => (
+							<UrLocationListItem
+								key={locationKey(city)}
+								locationKey={locationKey(city)}
+								name={city.name}
+								providerCount={city.provider_count}
+								onClick={() => onSelectLocation(city)}
+								strongPrivacy={city.strong_privacy}
+								unstable={!city.stable}
+							/>
+						))}
+					</div>
+				)}
+			</div>
+		))}
 	</div>
+);
+
+const ToggleSwitch: React.FC<{
+	enabled: boolean;
+	onToggle: () => void;
+	disabled?: boolean;
+	label: string;
+}> = ({ enabled, onToggle, disabled, label }) => (
+	<button
+		type="button"
+		onClick={onToggle}
+		disabled={disabled}
+		aria-label={label}
+		className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+		style={{
+			backgroundColor: enabled ? "var(--ur-color-green, #22c55e)" : "var(--color-surface-3, #3f3f46)",
+		}}
+	>
+		<span
+			className="pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition duration-200 ease-in-out"
+			style={{ transform: enabled ? "translateX(16px)" : "translateX(0)" }}
+		/>
+	</button>
 );
 
 export default ConnectScreen;

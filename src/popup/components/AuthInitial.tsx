@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { UrButton, UrInput, UrText } from "@urnetwork/elements/react";
 import { getMessage } from "@/utils/i18n";
 import { useAuth, useAuthCodeLogin } from "@urnetwork/sdk-js/react";
-import { Screen } from "./Screen";
 
 interface JWTReceivedMessage {
 	type: "JWT_RECEIVED";
@@ -12,17 +11,16 @@ interface JWTReceivedMessage {
 
 const AuthInitial: React.FC = () => {
 	const [authCode, setAuthCode] = useState("");
+	const [ssoLoading, setSsoLoading] = useState(false);
 	const { setAuth } = useAuth();
 	const { authCodeLogin, loading, error } = useAuthCodeLogin();
 
-	// Listen for JWT forwarded from the background script (set via external website)
 	useEffect(() => {
 		const messageListener = (message: JWTReceivedMessage) => {
 			if (message.type === "JWT_RECEIVED" && message.jwt) {
 				setAuth(message.jwt, message.networkName);
 			}
 		};
-
 		chrome.runtime.onMessage.addListener(messageListener);
 		return () => chrome.runtime.onMessage.removeListener(messageListener);
 	}, [setAuth]);
@@ -30,13 +28,26 @@ const AuthInitial: React.FC = () => {
 	const handleLogin = async (e?: React.FormEvent) => {
 		if (e) e.preventDefault();
 		if (!authCode.trim()) return;
-
 		try {
 			const result = await authCodeLogin(authCode.trim());
-			if (result.error) return; // error displayed via `error` from hook
+			if (result.error) return;
 			if (result.by_jwt) setAuth(result.by_jwt);
 		} catch (err) {
 			console.error("Login failed:", err);
+		}
+	};
+
+	const handleSsoLogin = async () => {
+		setSsoLoading(true);
+		try {
+			const response = await chrome.runtime.sendMessage({ type: "START_SSO" });
+			if (!response?.success) {
+				console.error("SSO failed:", response?.error);
+			}
+		} catch (err) {
+			console.error("Failed to initiate SSO:", err);
+		} finally {
+			setSsoLoading(false);
 		}
 	};
 
@@ -58,7 +69,7 @@ const AuthInitial: React.FC = () => {
 						href="https://ur.io"
 						target="_blank"
 						rel="noopener noreferrer"
-						className="text-ur-blue-electric underline"
+						className="text-ur-blue-electric hover:underline"
 					>
 						{linkBuffer.join("")}
 					</a>,
@@ -75,27 +86,51 @@ const AuthInitial: React.FC = () => {
 	};
 
 	return (
-		<Screen>
-			<div className="p-ur-md">
-				<UrText variant="header" className="mt-ur-lg">
+		<div className="h-full w-full flex items-center justify-center" style={{ background: "var(--color-surface-0)" }}>
+			<div className="w-full max-w-[300px] text-center">
+				{/* Logo */}
+				<div className="flex justify-center mb-6">
+					<img src="/logo.png" alt="URnetwork" className="h-12 w-12 rounded-xl" />
+				</div>
+
+				<h1 className="text-lg font-semibold mb-1">
 					{getMessage("stay_completely_private_and_anonymous")}
-				</UrText>
+				</h1>
+				<p className="text-sm opacity-50 mb-6">with URnetwork</p>
 
-				<UrText variant="subheader" className="mb-ur-2xl">
-					with URnetwork
-				</UrText>
+				{/* SSO Login button */}
+				<UrButton
+					onClick={handleSsoLogin}
+					loading={ssoLoading}
+					disabled={ssoLoading}
+					fullWidth
+					className="mb-4"
+				>
+					Login with SSO
+				</UrButton>
 
-				<form onSubmit={handleLogin}>
-					<UrInput
-						label={getMessage("auth_code_input_label")}
-						placeholder={getMessage("auth_code_input_placeholder")}
-						className="mb-ur-lg"
-						value={authCode}
-						onInput={(e) => setAuthCode(e.detail.value)}
-						invalid={!!error}
-						hint={error ? getMessage("auth_code_input_invalid") : undefined}
-						type="password"
-					/>
+				{/* Divider */}
+				<div className="flex items-center gap-3 mb-4">
+					<div className="flex-1 h-px opacity-15" style={{ background: "white" }} />
+					<span className="text-xs opacity-40">or</span>
+					<div className="flex-1 h-px opacity-15" style={{ background: "white" }} />
+				</div>
+
+				{/* Manual auth code form */}
+				<form onSubmit={handleLogin} className="text-left">
+					<label className="block text-sm font-medium opacity-70 mb-1.5">
+						{getMessage("auth_code_input_label")}
+					</label>
+					<div className="mb-4 rounded-xl overflow-hidden" style={{ background: "var(--color-surface-2)" }}>
+						<UrInput
+							placeholder={getMessage("auth_code_input_placeholder")}
+							value={authCode}
+							onInput={(e) => setAuthCode(e.detail.value)}
+							invalid={!!error}
+							hint={error ? getMessage("auth_code_input_invalid") : undefined}
+							type="password"
+						/>
+					</div>
 
 					<UrButton
 						buttonType="submit"
@@ -103,27 +138,26 @@ const AuthInitial: React.FC = () => {
 						loading={loading}
 						disabled={loading || !authCode.trim()}
 						fullWidth
-						className="mb-ur-lg"
+						variant="secondary"
+						className="mb-4"
 					>
 						{getMessage("launch")}
 					</UrButton>
 				</form>
 
-				<UrText>
-					{renderInstructionsWithLink(
-						getMessage("access_auth_code_instructions"),
-					)}
-				</UrText>
+				<p className="text-xs opacity-60 leading-relaxed">
+					{renderInstructionsWithLink(getMessage("access_auth_code_instructions"))}
+				</p>
 
 				{error && (
-					<div className="mt-ur-sm">
+					<div className="mt-3">
 						<UrText variant="small" className="text-ur-coral">
 							{error.message}
 						</UrText>
 					</div>
 				)}
 			</div>
-		</Screen>
+		</div>
 	);
 };
 

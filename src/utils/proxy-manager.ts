@@ -67,6 +67,16 @@ class ProxyManager {
 		return this.killSwitchEnabled;
 	}
 
+	isListenerActive(): boolean {
+		const firefoxProxyApi = getFirefoxProxyApi();
+		if (!firefoxProxyApi?.onRequest || !this.firefoxListener) return false;
+		try {
+			return firefoxProxyApi.onRequest.hasListener(this.firefoxListener);
+		} catch {
+			return false;
+		}
+	}
+
 	private ensureFirefoxListener(): void {
 		if (this.firefoxListener) return;
 
@@ -131,6 +141,9 @@ class ProxyManager {
 		}
 		this.firefoxConfig = null;
 		this.firefoxMultiIpSlots = [];
+		// Note: this.firefoxListener is intentionally NOT nulled here. Keeping the
+		// reference allows isListenerActive() to call hasListener() after removal and
+		// correctly return false, rather than short-circuiting on the null check.
 	}
 
 	enableMultiIp(slots: PacSlot[]): void {
@@ -192,26 +205,44 @@ class ProxyManager {
 	 */
 	async getActualProxyState(): Promise<ProxyState> {
 		if (isFirefoxProxyApiAvailable()) {
+			// In-memory slots present: listener is active
+			if (this.firefoxMultiIpSlots.length > 0) {
+				return Promise.resolve({ enabled: true, mode: "pac" as ProxyMode, config: null });
+			}
+
 			return new Promise((resolve) => {
-				if (this.firefoxMultiIpSlots.length > 0) {
-					resolve({ enabled: true, mode: "pac", config: null });
-					return;
-				}
+				chrome.storage.local.get(
+					[STORAGE_KEYS.ENABLED, STORAGE_KEYS.CONFIG, "multi_ip_slots"],
+					(result) => {
+						// Check storage for multi-IP mode (covers post-restart window before restoreState() runs)
+						const rawSlots = result["multi_ip_slots"] as string | undefined;
+						if (result[STORAGE_KEYS.ENABLED] && rawSlots) {
+							try {
+								const slots = JSON.parse(rawSlots) as PacSlot[];
+								if (slots.length > 0) {
+									resolve({ enabled: true, mode: "pac", config: null });
+									return;
+								}
+							} catch {
+								// fall through to fixed/direct check
+							}
+						}
 
-				chrome.storage.local.get([STORAGE_KEYS.ENABLED, STORAGE_KEYS.CONFIG], (result) => {
-					if (this.firefoxConfig) {
-						resolve({ enabled: true, mode: "fixed", config: this.firefoxConfig });
-						return;
-					}
+						// Check in-memory fixed config or storage fixed config
+						if (this.firefoxConfig) {
+							resolve({ enabled: true, mode: "fixed", config: this.firefoxConfig });
+							return;
+						}
 
-					const stored = result[STORAGE_KEYS.CONFIG] as ProxyConfig | undefined;
-					if (result[STORAGE_KEYS.ENABLED] && stored) {
-						resolve({ enabled: true, mode: "fixed", config: stored });
-						return;
-					}
+						const stored = result[STORAGE_KEYS.CONFIG] as ProxyConfig | undefined;
+						if (result[STORAGE_KEYS.ENABLED] && stored) {
+							resolve({ enabled: true, mode: "fixed", config: stored });
+							return;
+						}
 
-					resolve({ enabled: false, mode: "direct", config: null });
-				});
+						resolve({ enabled: false, mode: "direct", config: null });
+					},
+				);
 			});
 		}
 
@@ -338,7 +369,29 @@ class ProxyManager {
 		await this.loadKillSwitch();
 
 		if (isFirefoxProxyApiAvailable()) {
-			const result = await chrome.storage.local.get([STORAGE_KEYS.ENABLED, STORAGE_KEYS.CONFIG]);
+			const result = await chrome.storage.local.get([
+				STORAGE_KEYS.ENABLED,
+				STORAGE_KEYS.CONFIG,
+				"multi_ip_slots",
+			]);
+
+			// Try to restore multi-IP mode first
+			const rawSlots = result["multi_ip_slots"] as string | undefined;
+			if (result[STORAGE_KEYS.ENABLED] && rawSlots) {
+				try {
+					const slots = JSON.parse(rawSlots) as PacSlot[];
+					if (slots.length > 0) {
+						this.enableMultiIp(slots);
+						return;
+					}
+				} catch (err) {
+					console.error("Failed to restore Firefox multi-IP proxy config:", err);
+					await chrome.storage.local.set({ [STORAGE_KEYS.ENABLED]: false });
+					return;
+				}
+			}
+
+			// Fall back to restoring standard/fixed mode
 			const stored = result[STORAGE_KEYS.CONFIG] as ProxyConfig | undefined;
 			if (result[STORAGE_KEYS.ENABLED] && stored) {
 				try {
