@@ -1,6 +1,6 @@
 # URnetwork Browser Extension
 
-A cross-browser extension for [URnetwork](https://ur.network), built with:
+A cross-browser extension for [URnetwork](https://ur.io), built with:
 
 - [Vite](https://vitejs.dev)
 - [React](https://react.dev)
@@ -17,7 +17,7 @@ The fastest way to install the extension is from a pre-built release archive.
 ### Where to get releases
 
 - Check the [`release/`](./release) folder in this repository
-- Or visit the [GitHub Releases page](https://github.com/Ryanmello07/urnetwork-extension/releases)
+- Or visit the [GitHub Releases page](https://github.com/urnetwork/build/releases)
 
 Each release provides two ZIP files:
 
@@ -70,8 +70,8 @@ Firefox requires a temporary install through `about:debugging`. This is because 
 ### Clone the repository
 
 ```bash
-git clone git@github.com:Ryanmello07/urnetwork-extension.git
-cd urnetwork-extension
+git clone git@github.com:urnetwork/extension.git
+cd extension
 ```
 
 ### Install dependencies
