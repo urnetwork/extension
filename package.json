@@ -1,7 +1,7 @@
 {
 	"name": "@urnetwork/extension",
 	"private": true,
-	"version": "0.1.0",
+	"version": "0.1.7",
 	"type": "module",
 	"scripts": {
 		"clean": "rm -rf dist",

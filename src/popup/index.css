@@ -23,16 +23,22 @@
 	--color-ur-maroon: var(--ur-color-maroon);
 	--color-ur-gray: var(--ur-color-gray);
 	--color-ur-gray-dark: var(--ur-color-gray-dark);
+
+	/* Surface layers */
+	--color-surface-0: #0f1117;
+	--color-surface-1: #181b23;
+	--color-surface-2: #1f2330;
+	--color-surface-3: #272b3a;
 }
 
 :root {
-	font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 	line-height: 1.5;
 	font-weight: 400;
 
 	color-scheme: dark;
-	color: rgba(255, 255, 255, 0.87);
-	background-color: var(--ur-color-black, #1a1a1a);
+	color: rgba(255, 255, 255, 0.92);
+	background-color: var(--color-surface-0);
 
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
@@ -44,10 +50,10 @@ body {
 	margin: 0;
 	display: flex;
 	flex-direction: column;
-	min-width: 400px;
-	max-width: 400px;
-	height: 560px;
-	background-color: var(--ur-color-black);
+	min-width: 680px;
+	max-width: 680px;
+	height: 520px;
+	background-color: var(--color-surface-0);
 	overflow: hidden;
 }
 
@@ -55,16 +61,35 @@ body {
 	height: 100%;
 	width: 100%;
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	text-align: left;
 }
 
 a {
 	font-weight: 500;
 	color: var(--ur-color-blue-electric, #4a9eff);
-	text-decoration: underline;
+	text-decoration: none;
 }
 
 a:hover {
 	opacity: 0.85;
+	text-decoration: underline;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+	width: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.12);
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.2);
 }
