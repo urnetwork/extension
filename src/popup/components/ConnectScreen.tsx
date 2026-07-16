@@ -253,23 +253,73 @@ export const ConnectScreen: React.FC = () => {
 
 	// ── location selection ────────────────────────────────────────────────────
 
-	const selectLocation = useCallback(
-		async (location: ConnectLocation) => {
+	// Apply a location change. When already connected, try to delegate the change
+	// to an attached ur.io app's DeviceRemote (device-rpc → the hosted device
+	// re-routes with NO proxy reconnect, and every attached surface gets
+	// connectLocationChange). If no app is attached (or delegation fails), fall
+	// back to the normal connect/swap. When idle, just connect here.
+	const applyLocationChange = useCallback(
+		async (location: ConnectLocation | null) => {
 			setSelectedLocation(location);
-			await chromeStorageAdapter.setItem(
-				STORAGE_KEY_LOCATION,
-				JSON.stringify(location),
-			);
-			handleConnect(location);
+			if (location) {
+				await chromeStorageAdapter.setItem(STORAGE_KEY_LOCATION, JSON.stringify(location));
+			} else {
+				await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
+			}
+
+			const isConnected =
+				status === "connected" ||
+				status === "reconnecting" ||
+				status === "degraded" ||
+				(proxyConfig !== null && status === "idle");
+
+			if (isConnected) {
+				try {
+					const res = await chrome.runtime.sendMessage({
+						type: "CHANGE_LOCATION",
+						locationId: location?.connect_location_id?.location_id ?? null,
+						name: location?.name,
+					});
+					if (res?.success && res.delegated) {
+						return; // an app applied it over the device-rpc — no reconnect
+					}
+				} catch {
+					// no receiver / delegation failed — fall through to reconnect
+				}
+			}
+			await handleConnect(location ?? undefined);
 		},
-		[handleConnect],
+		[status, proxyConfig, handleConnect],
 	);
 
-	const selectBestAvailable = useCallback(async () => {
-		setSelectedLocation(null);
-		await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
-		handleConnect();
-	}, [handleConnect]);
+	const selectLocation = useCallback(
+		(location: ConnectLocation) => applyLocationChange(location),
+		[applyLocationChange],
+	);
+
+	const selectBestAvailable = useCallback(
+		() => applyLocationChange(null),
+		[applyLocationChange],
+	);
+
+	// Reflect an app-initiated location change (scenario 2) while the popup is
+	// open: the background broadcasts LOCATION_UPDATED after the app re-routed
+	// the hosted device. Just update the displayed location — no reconnect.
+	useEffect(() => {
+		const onMessage = (msg: { type?: string; locationId?: string | null; name?: string }) => {
+			if (msg?.type !== "LOCATION_UPDATED") return;
+			setSelectedLocation(
+				msg.locationId
+					? ({
+							connect_location_id: { location_id: msg.locationId },
+							...(msg.name ? { name: msg.name } : {}),
+						} as ConnectLocation)
+					: null,
+			);
+		};
+		chrome.runtime.onMessage.addListener(onMessage);
+		return () => chrome.runtime.onMessage.removeListener(onMessage);
+	}, []);
 
 	// ── logout ────────────────────────────────────────────────────────────────
 

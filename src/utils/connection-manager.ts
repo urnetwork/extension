@@ -1,9 +1,11 @@
-import type { ConnectLocation, AuthNetworkClientArgs } from "node_modules/@urnetwork/sdk-js/dist/generated";
+import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
 import { parseByJwtClientId } from "@urnetwork/sdk-js/react";
 import type { ProxyConfig } from "./proxy-manager";
 import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "./pac-script";
 import { chromeStorageAdapter } from "./storage-adapter";
 import { getKillSwitch } from "./kill-switch";
+import { buildAuthParams } from "./auth-params";
+import { saveBridgeSession, clearBridgeSession } from "../bridge/session";
 
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
@@ -23,12 +25,15 @@ export interface ConnectionManagerCallbacks {
 	onError: (message: string | null) => void;
 }
 
-type AuthNetworkClientFn = (args: AuthNetworkClientArgs) => Promise<{
+type AuthNetworkClientFn = (args: ReturnType<typeof buildAuthParams>) => Promise<{
 	by_client_jwt?: string;
 	proxy_config_result: {
 		auth_token?: string;
 		proxy_host?: string;
 		https_proxy_port?: number;
+		// device-rpc endpoint base for the app bridge (https://api.<proxy_host>:<api_port>)
+		api_base_url?: string;
+		api_port?: number;
 		expiration_time: string;
 		keepalive_seconds: number;
 	} | null;
@@ -66,38 +71,6 @@ const MULTI_IP_PING_INTERVAL_S = 300; // 5 minutes
 
 function isFirefox(): boolean {
 	return Boolean((globalThis as any).browser?.proxy?.onRequest);
-}
-
-function buildAuthParams(location?: ConnectLocation): AuthNetworkClientArgs {
-	const locationConfig = location
-		? {
-				connect_location_id: {
-					location_id: location.connect_location_id?.location_id,
-				},
-				stable: true,
-				strong_privacy: true,
-			}
-		: {
-				connect_location_id: { best_available: true },
-				stable: true,
-				strong_privacy: true,
-			};
-
-	return {
-		description: "",
-		device_spec: "",
-		proxy_config: {
-			lock_caller_ip: false,
-			lock_ip_list: [],
-			enable_socks: true,
-			enable_http: true,
-			http_require_auth: false,
-			initial_device_state: {
-				location: locationConfig,
-				performance_profile: null,
-			},
-		},
-	};
 }
 
 export class ConnectionManager {
@@ -177,6 +150,7 @@ export class ConnectionManager {
 				this.multiClientIds = [];
 				await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
 				await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
+				await clearBridgeSession();
 			} else {
 				await chrome.runtime.sendMessage({ type: "DISABLE_VPN" });
 				if (this.clientId) {
@@ -188,6 +162,7 @@ export class ConnectionManager {
 					this.clientId = null;
 					await chromeStorageAdapter.removeItem(STORAGE_KEY_CLIENT_ID);
 				}
+				await clearBridgeSession();
 			}
 		} catch {
 			// best-effort
@@ -274,6 +249,21 @@ export class ConnectionManager {
 		}
 		this.clientId = newClientId;
 		await chromeStorageAdapter.setItem(STORAGE_KEY_CLIENT_ID, newClientId);
+
+		// Record the session for the app bridge: the ur.io app uses the signed
+		// proxy id (auth_token) + api base url to attach a DeviceRemote to the
+		// hosted device over the device-rpc websocket.
+		await saveBridgeSession({
+			clientId: newClientId,
+			signedProxyId: pr.auth_token,
+			proxyHost: pr.proxy_host,
+			httpsProxyPort: pr.https_proxy_port,
+			apiBaseUrl:
+				pr.api_base_url ??
+				(pr.api_port ? `https://api.${pr.proxy_host}:${pr.api_port}` : null),
+			expirationTime: pr.expiration_time,
+			locationId: this.location?.connect_location_id?.location_id ?? null,
+		});
 
 		this.callbacks.onProxyChange(config);
 

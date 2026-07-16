@@ -33,6 +33,22 @@ export default defineManifest({
 			type: "module",
 		},
 	permissions: ["proxy", "storage", "alarms"],
+	// App content-channel bridge: relays window.postMessage from the ur.io app
+	// to the background over a Port. The only page↔extension channel that works
+	// on Firefox too (externally_connectable is Chromium-only for web pages).
+	content_scripts: [
+		{
+			matches: [
+				"https://ur.io/*",
+				"https://app.ur.network/*",
+				// local development of the ur.io app
+				"http://localhost/*",
+			],
+			js: ["src/bridge/content.ts"],
+			run_at: "document_start",
+			all_frames: false,
+		},
+	],
 	host_permissions: isFirefox
 		? ["<all_urls>", "https://api.bringyour.com/*", "https://api-v4.bringyour.com/*"]
 		: ["https://api.bringyour.com/*", "https://api-v4.bringyour.com/*"],
