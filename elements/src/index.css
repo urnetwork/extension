@@ -1,0 +1,72 @@
+@font-face {
+	font-family: "AbcGravityExtended";
+	src: url("./assets/fonts/abcgravity_extended.otf") format("opentype");
+	font-weight: normal;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: "AbcGravityExtraCondensed";
+	src: url("./assets/fonts/abcgravity_extra_condensed.otf") format("opentype");
+	font-weight: normal;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: "PpNeueBitBold";
+	src: url("./assets/fonts/pp_neue_bit_bold.ttf") format("truetype");
+	font-weight: normal;
+	font-style: normal;
+}
+
+@font-face {
+	font-family: "PpNeueMontrealRegular";
+	src: url("./assets/fonts/pp_neue_montreal_regular.ttf") format("truetype");
+	font-weight: normal;
+	font-style: normal;
+}
+
+html {
+	font-size: 16px; /* 1rem = 16px */
+}
+
+:root {
+	/**
+	 * Font Families
+	 */
+	--ur-font-family-base:
+		"PpNeueMontrealRegular", system-ui, -apple-system, sans-serif;
+
+	/**
+	 * Color Palette
+	 */
+	--ur-color-white: #f8f8f8;
+	--ur-color-black: #101010;
+	--ur-color-blue-electric: #0039de;
+	--ur-color-blue-light: #d6e6f4;
+	--ur-color-blue-navy: #1a1460;
+	--ur-color-green: #87fb67;
+	--ur-color-pink: #ed8fff;
+	--ur-color-coral: #ff6c58;
+	--ur-color-yellow-light: #eff7bb;
+	--ur-color-maroon: #421006;
+	--ur-color-gray: #b7b7b7;
+	--ur-color-gray-dark: #909090;
+	--ur-color-border: color-mix(
+		in srgb,
+		var(--ur-color-black, #101010),
+		#fff 10%
+	);
+
+	/**
+   * Spacing Scale
+   * Based on 8px grid system
+   */
+	--ur-space-xs: 0.25rem; /* 4px */
+	--ur-space-sm: 0.5rem; /* 8px */
+	--ur-space-md: 1rem; /* 16px */
+	--ur-space-lg: 1.5rem; /* 24px */
+	--ur-space-xl: 2rem; /* 32px */
+	--ur-space-2xl: 3rem; /* 48px */
+	--ur-space-3xl: 4rem; /* 64px */
+}

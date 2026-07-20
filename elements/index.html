@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" type="image/svg+xml" href="/vite.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>URnetwork UI Elements</title>
+		<link rel="stylesheet" href="./src/index.css" />
+		<script type="module">
+			// Import all components at once
+			import "./src/components/index.ts";
+		</script>
+	</head>
+	<body style="padding: 16px; background: var(--ur-color-black)">
+		<div style="display: flex; flex-flow: column">
+			<!-- Text elements -->
+			<h2
+				style="
+					font-family: PpNeueBitBold, system-ui, sans-serif;
+					color: var(--ur-color-white);
+				"
+			>
+				Text
+			</h2>
+
+			<ur-text variant="header" style="margin-bottom: var(--ur-space-md)">
+				Heading 1
+			</ur-text>
+
+			<ur-text variant="subheader" style="margin-bottom: var(--ur-space-md)">
+				Heading 2
+			</ur-text>
+
+			<ur-text variant="body" style="margin-bottom: var(--ur-space-md)">
+				body text - Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
+				do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+			</ur-text>
+
+			<ur-text variant="small" style="margin-bottom: var(--ur-space-md)">
+				small text - Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+				Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+			</ur-text>
+
+			<h2
+				style="
+					font-family: PpNeueBitBold, system-ui, sans-serif;
+					color: var(--ur-color-white);
+				"
+			>
+				Icons
+			</h2>
+
+			<div
+				class="icon-row"
+				style="display: flex; gap: 16px; margin-bottom: 16px"
+			>
+				<ur-icon-spinner></ur-icon-spinner>
+			</div>
+
+			<h2
+				style="
+					font-family: PpNeueBitBold, system-ui, sans-serif;
+					color: var(--ur-color-white);
+				"
+			>
+				Menu
+			</h2>
+
+			<div
+				class="icon-row"
+				style="display: flex; gap: 16px; margin-bottom: 16px"
+			>
+				<ur-menu>
+					<ur-menu-button slot="button">
+						<ur-icon-hamburger></ur-icon-hamburger>
+					</ur-menu-button>
+					<ur-menu-item><ur-text>Profile</ur-text></ur-menu-item>
+					<ur-menu-item><ur-text>Settings</ur-text></ur-menu-item>
+					<ur-menu-item><ur-text>Logout</ur-text></ur-menu-item>
+				</ur-menu>
+			</div>
+
+			<!-- Buttons -->
+			<h2
+				style="
+					font-family: PpNeueBitBold, system-ui, sans-serif;
+					color: var(--ur-color-white);
+				"
+			>
+				Buttons
+			</h2>
+
+			<div style="display: flex; gap: 8px; margin-bottom: 16px">
+				<ur-button>Connect</ur-button>
+				<ur-button variant="secondary">Connect</ur-button>
+				<ur-button disabled>Disabled primary</ur-button>
+				<ur-button loading>Loading</ur-button>
+			</div>
+
+			<div style="display: flex; gap: 8px; margin-bottom: 16px; width: 300px">
+				<ur-button fullwidth>Full width</ur-button>
+			</div>
+
+			<div style="display: flex; gap: 8px; margin-bottom: 16px; width: 300px">
+				<ur-back-button>Back</ur-back-button>
+			</div>
+
+			<!-- Inputs -->
+			<h2
+				style="
+					font-family: PpNeueBitBold, system-ui, sans-serif;
+					color: var(--ur-color-white);
+				"
+			>
+				Inputs
+			</h2>
+
+			<div
+				style="
+					display: flex;
+					flex-direction: column;
+					gap: 32px;
+					max-width: 300px;
+					margin-bottom: var(--ur-space-lg);
+				"
+			>
+				<ur-input label="Text" placeholder="Enter some text"></ur-input>
+				<ur-input label="Password" type="password"></ur-input>
+				<ur-input
+					label="Readonly"
+					value="You can't change this"
+					readonly
+				></ur-input>
+				<ur-input label="Disabled" disabled value="Cannot edit this"></ur-input>
+				<ur-input
+					label="With error"
+					hint="Please enter a valid email"
+					invalid
+				></ur-input>
+				<ur-input
+					label="With hint"
+					hint="Your password must be 12 characters long"
+				></ur-input>
+				<ur-input
+					label="Spinner"
+					value="Processing something"
+					loading
+				></ur-input>
+			</div>
+
+			<!-- Locations List -->
+			<h2
+				style="
+					font-family: PpNeueBitBold, system-ui, sans-serif;
+					color: var(--ur-color-white);
+				"
+			>
+				Locations List
+			</h2>
+
+			<ul>
+				<ur-location-list-item
+					locationKey="best-available-provider"
+					name="Best available provider"
+				></ur-location-list-item>
+				<ur-location-list-item
+					locationKey="us"
+					name="United States"
+					providerCount="1234567"
+				></ur-location-list-item>
+				<ur-location-list-item
+					locationKey="de"
+					name="Germany"
+					providerCount="123456"
+					strongPrivacy
+				></ur-location-list-item>
+				<ur-location-list-item
+					locationKey="mx"
+					name="Mexico"
+					providerCount="2345"
+					unstable
+				></ur-location-list-item>
+				<ur-location-list-item
+					locationKey="fr"
+					name="France"
+					providerCount="98"
+					strongPrivacy
+					unstable
+				></ur-location-list-item>
+			</ul>
+
+			<ur-text>Selected location</ur-text>
+
+			<ur-selected-location
+				locationKey="us"
+				name="Canada"
+				providerCount="1234567"
+				strongPrivacy
+				unstable
+			></ur-selected-location>
+
+			<ur-selected-location
+				locationKey="best-available-provider"
+				name="Best available provider"
+			></ur-selected-location>
+		</div>
+	</body>
+</html>
