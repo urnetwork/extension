@@ -1,19 +1,18 @@
 {
 	"name": "@urnetwork/elements",
+	"private": true,
 	"author": "URnetwork <support@ur.io> (https://ur.io)",
 	"license": "MPL-2.0",
 	"version": "0.0.1-beta.5",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/urnetwork/elements.git"
-	},
-	"publishConfig": {
-		"access": "public"
+		"url": "git+https://github.com/urnetwork/extension.git",
+		"directory": "elements"
 	},
 	"description": "A collection of web components and React components for building URnetwork interfaces.",
 	"homepage": "https://ur.io",
 	"bugs": {
-		"url": "https://github.com/urnetwork/elements/issues"
+		"url": "https://github.com/urnetwork/extension/issues"
 	},
 	"type": "module",
 	"exports": {
@@ -31,17 +30,8 @@
 		"dev": "vite",
 		"build": "vite build",
 		"build:demo": "vite build --mode demo",
-		"preview": "vite preview",
-		"prepublishOnly": "npm run build",
-		"release:beta": "npm version prerelease --preid=beta && npm publish --tag beta",
-		"release:patch": "npm version patch && npm publish",
-		"release:minor": "npm version minor && npm publish",
-		"release:major": "npm version major && npm publish"
+		"preview": "vite preview"
 	},
-	"files": [
-		"dist",
-		"README.md"
-	],
 	"devDependencies": {
 		"@lit/react": "^1.0.0",
 		"@types/node": "^20.0.0",

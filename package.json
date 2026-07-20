@@ -19,10 +19,11 @@
 	},
 	"dependencies": {
 		"@crxjs/vite-plugin": "^2.3.0",
+		"@lit/react": "^1.0.8",
 		"@tailwindcss/vite": "^4.1.18",
-		"@urnetwork/elements": "^0.0.1-beta.6",
 		"@urnetwork/localizations": "^0.0.6",
 		"@urnetwork/sdk-js": "^0.0.1-beta.5",
+		"lit": "^3.3.2",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
 		"react-router-dom": "^7.13.0",

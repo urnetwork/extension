@@ -1,6 +1,8 @@
 # URnetwork Web Elements
 
-This repository contains UI web components for the URnetwork project, built using Lit and React.
+UI web components for the URnetwork project, built using Lit and React.
+
+This package lives in the extension repository (`elements/`) and is consumed directly from source — the extension's Vite and TypeScript configs alias `@urnetwork/elements/*` to `elements/src/*`. It is no longer published to npm. The former standalone repository was https://github.com/urnetwork/elements (archived).
 
 ## Structure
 
@@ -23,9 +25,4 @@ https://pangrampangram.com/products/neue-montreal
 
 ## Deployment
 
-- Make sure everything is committed and pushed to the main branch.
-- If you're not already, login to npm with `npm login`.
-- `npm run build` to build the package.
-- Run `npm pack --dry-run` to see what will be included in the package.
-- If everything looks good, run `npm run release:patch` to publish the package. There are also `release:beta`, `release:minor`, and `release:major` scripts available for versioning.
-- Tag it on Github after publishing like `git tag vx.y.z` and `git push --tags`.
+Nothing to deploy — the extension builds these components in from `elements/src` and they ship with each extension release.

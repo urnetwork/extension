@@ -2,7 +2,8 @@
 	"compilerOptions": {
 		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
 		"target": "ES2022",
-		"useDefineForClassFields": true,
+		"experimentalDecorators": true,
+		"useDefineForClassFields": false,
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"module": "ESNext",
 		"types": ["vite/client", "chrome"],
@@ -26,7 +27,9 @@
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["src/*"],
+			"@urnetwork/elements/react": ["elements/src/react/index.ts"],
+			"@urnetwork/elements/components": ["elements/src/components/index.ts"],
 		},
 	},
-	"include": ["src"],
+	"include": ["src", "elements/src"],
 }

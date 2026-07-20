@@ -44,7 +44,7 @@ export class Menu extends LitElement {
 		}
 	};
 
-	private _handleMenuItemClick = (e: Event) => {
+	private _handleMenuItemClick = () => {
 		// Auto-close menu when an item is clicked
 		this.open = false;
 	};
