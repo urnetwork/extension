@@ -1,6 +1,6 @@
 {
   "access_auth_code_instructions": {
-    "message": "Για να αποκτήσετε πρόσβαση στον κωδικό ταυτοποίησης, δημιουργήστε λογαριασμό και συνδεθείτε στο {link}ur.io{/link}. Αφού συνδεθείτε, αντιγράψτε έναν κωδικό ταυτοποίησης και χρησιμοποιήστε τον για να συνδεθείτε στην επέκταση.",
+    "message": "Για να αποκτήσετε πρόσβαση στον κωδικό ταυτοποίησης, δημιουργήστε λογαριασμό και συνδεθείτε στο {link}ur.io{/link}. Μεταβείτε σε Λογαριασμός -> Ρυθμίσεις -> Δημιουργία/Αντιγραφή κωδικού ταυτοποίησης -> Επικόλληση -> Έτοιμοι!",
     "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
   },
   "auth_code_input_invalid": {
@@ -11,13 +11,17 @@
     "message": "Κωδικός ταυτοποίησης",
     "description": "Auth code input label"
   },
+  "authentication_code_input_placeholder": {
+    "message": "Εισαγάγετε τον μοναδικό κωδικό ταυτοποίησης",
+    "description": "Placeholder text for the authentication code input field"
+  },
   "auth_code_input_placeholder": {
-    "message": "Εισάγετε τον μοναδικό κωδικό ταυτοποίησης",
+    "message": "Εισαγάγετε τον μοναδικό κωδικό ταυτοποίησης",
     "description": "Placeholder text for the authentication code input field"
   },
   "back": {
     "message": "Πίσω",
-    "description": "\tButton text for going back to the previous screen.\n"
+    "description": "\tButton text for going back to the previous screen."
   },
   "best_available_provider": {
     "message": "Καλύτερος διαθέσιμος πάροχος",
@@ -34,6 +38,10 @@
   "connect": {
     "message": "Σύνδεση",
     "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue_txt": {
+    "message": "Συνέχεια",
+    "description": "Continue button label."
   },
   "continue": {
     "message": "Συνέχεια",
@@ -52,36 +60,60 @@
     "description": "Disconnect VPN button text"
   },
   "dont_see_it": {
-    "message": "Δεν το βλέπετε;",
+    "message": "Δεν το βλέπεις;",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "forgot_password": {
+    "message": "Ξέχασες τον κωδικό σου;",
+    "description": "Forgot your password?"
+  },
   "forgot_your_password": {
-    "message": "Ξεχάσατε τον κωδικό σας;",
+    "message": "Ξέχασες τον κωδικό σου;",
     "description": "Forgot your password?"
   },
   "get_started": {
-    "message": "Ξεκινήστε",
-    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+    "message": "Ξεκίνα",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen."
   },
   "its_nice_to_see_you_again": {
-    "message": "Χαίρομαι που σε βλέπω ξανά",
-    "description": "\tGreeting text on Enter user auth password screen.\n"
+    "message": "Χαίρομαι που σε ξαναβλέπω",
+    "description": "\tGreeting text on Enter user auth password screen."
   },
   "join_urnetwork": {
-    "message": "Εγγραφή στο URnetwork",
+    "message": "Συνδεθείτε στο URnetwork",
     "description": "Join URnetwork title on the Create Network screen"
   },
   "launch": {
     "message": "Εκκίνηση",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
-  "network_name_input_hint": {
-    "message": "Τα ονόματα δικτύου πρέπει να έχουν 6 ή περισσότερους χαρακτήρες",
-    "description": "Hint text indicating the required length for a network name input."
+  "login_verify_header": {
+    "message": "Έχετε ένα email",
+    "description": "Header for verify screen"
+  },
+  "verify_screen_header": {
+    "message": "Έχετε ένα email",
+    "description": "Header for verify screen"
+  },
+  "network_name_label": {
+    "message": "Όνομα δικτύου",
+    "description": "Label for the network name input field"
   },
   "network_name_input_label": {
     "message": "Όνομα δικτύου",
     "description": "Label for the network name input field"
+  },
+  "network_name_length_error": {
+    "message": "Τα ονόματα δικτύου πρέπει να έχουν τουλάχιστον 6 χαρακτήρες.",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_hint": {
+    "message": "Τα ονόματα δικτύου πρέπει να έχουν τουλάχιστον 6 χαρακτήρες.",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_placeholder": {
+    "message": "Το όνομα του δικτύου σας",
+    "description": "Placeholder text for the network name input field."
   },
   "network_name_input_placeholder": {
     "message": "Το όνομα του δικτύου σας",
@@ -91,9 +123,17 @@
     "message": "Αυτό το όνομα δικτύου χρησιμοποιείται ήδη",
     "description": "Error for network name input to display when a network name is already taken."
   },
+  "password_label": {
+    "message": "Κωδικός πρόσβασης",
+    "description": "Label for the password input field."
+  },
   "password": {
     "message": "Κωδικός πρόσβασης",
     "description": "Label for the password input field."
+  },
+  "password_support_txt": {
+    "message": "Ο κωδικός πρόσβασης πρέπει να έχει τουλάχιστον 12 χαρακτήρες",
+    "description": "Hint for password input length requirements."
   },
   "password_input_length_hint": {
     "message": "Ο κωδικός πρόσβασης πρέπει να έχει τουλάχιστον 12 χαρακτήρες",
@@ -107,8 +147,12 @@
     "message": "Περιοχές",
     "description": "Provider list group title for regions"
   },
+  "resend_verify_code": {
+    "message": "Επανάληψη αποστολής κωδικού",
+    "description": "Button text to resend the verification code"
+  },
   "resend_code": {
-    "message": "Επαναποστολή κωδικού",
+    "message": "Επανάληψη αποστολής κωδικού",
     "description": "Button text to resend the verification code"
   },
   "reset_it": {
@@ -116,7 +160,7 @@
     "description": "Button text for resetting password"
   },
   "retry": {
-    "message": "Δοκιμάστε ξανά",
+    "message": "Προσπαθήστε ξανά",
     "description": "Retry action label"
   },
   "search_providers_input_label": {
@@ -128,12 +172,12 @@
     "description": "Search providers input placeholder text"
   },
   "something_went_wrong": {
-    "message": "Κάτι πήγε στραβά",
+    "message": "Κάτι πήγε στραβά.",
     "description": "Something went wrong error message"
   },
   "stay_completely_private_and_anonymous": {
     "message": "Μείνετε εντελώς ιδιωτικοί και ανώνυμοι",
-    "description": "Used as a headline in the Initial Auth carousel.\n"
+    "description": "Used as a headline in the Initial Auth carousel."
   },
   "terms_checkbox": {
     "message": "Συμφωνώ με τους {terms_start}Όρους και Υπηρεσίες{terms_end} και την {privacy_start}Πολιτική Απορρήτου{privacy_end} του URnetwork",
@@ -141,14 +185,14 @@
   },
   "user_auth_input_label": {
     "message": "Email ή αριθμός τηλεφώνου",
-    "description": "Label for the user authentication input field.\n"
+    "description": "Label for the user authentication input field."
   },
   "user_auth_input_placeholder": {
     "message": "Εισαγάγετε το email ή τον αριθμό τηλεφώνου σας",
-    "description": "Placeholder text for the user authentication input field.\n"
+    "description": "Placeholder text for the user authentication input field."
   },
   "verify_explanation": {
-    "message": "Πες μας ποιος είσαι πραγματικά. Εισάγετε τον κωδικό που σας στείλαμε για να επαληθεύσετε την ταυτότητά σας.",
+    "message": "Πείτε μας ποιοι είστε πραγματικά. Εισάγετε τον κωδικό που σας στείλαμε για να επιβεβαιώσετε την ταυτότητά σας.",
     "description": "Sub header text explaining why verification is needed."
   },
   "verify_input_invalid": {
@@ -158,9 +202,5 @@
   "verify_input_label": {
     "message": "Κωδικός επαλήθευσης",
     "description": "Label for the verification code input field"
-  },
-  "verify_screen_header": {
-    "message": "Έχετε μήνυμα",
-    "description": "Header for verify screen"
   }
 }

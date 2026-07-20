@@ -1,6 +1,6 @@
 {
   "access_auth_code_instructions": {
-    "message": "ในการเข้าถึงรหัสยืนยันของคุณ ให้สร้างบัญชีและลงชื่อเข้าใช้ที่ {link}ur.io{/link} เมื่อลงชื่อเข้าใช้แล้ว ให้คัดลอกรหัสยืนยันและใช้เข้าสู่ระบบส่วนขยาย",
+    "message": "ในการเข้าถึงรหัสยืนยันของคุณ ให้สร้างบัญชีและลงชื่อเข้าใช้ที่ {link}ur.io{/link} ไปที่ บัญชี -> การตั้งค่า -> สร้าง/คัดลอกรหัสยืนยัน -> วาง -> เสร็จสิ้น!",
     "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
   },
   "auth_code_input_invalid": {
@@ -11,16 +11,20 @@
     "message": "รหัสยืนยันตัวตน",
     "description": "Auth code input label"
   },
+  "authentication_code_input_placeholder": {
+    "message": "ป้อนรหัสยืนยันตัวตนแบบใช้ครั้งเดียวของคุณ",
+    "description": "Placeholder text for the authentication code input field"
+  },
   "auth_code_input_placeholder": {
-    "message": "กรอกรหัสยืนยันตัวตนครั้งเดียวของคุณ",
+    "message": "ป้อนรหัสยืนยันตัวตนแบบใช้ครั้งเดียวของคุณ",
     "description": "Placeholder text for the authentication code input field"
   },
   "back": {
     "message": "ย้อนกลับ",
-    "description": "\tButton text for going back to the previous screen.\n"
+    "description": "\tButton text for going back to the previous screen."
   },
   "best_available_provider": {
-    "message": "ผู้ให้บริการที่ดีที่สุดที่มีอยู่",
+    "message": "ผู้ให้บริการที่ดีที่สุดที่พร้อมเชื่อมต่อ",
     "description": "VPN providers list option to select the best available provider"
   },
   "best_matches": {
@@ -34,6 +38,10 @@
   "connect": {
     "message": "เชื่อมต่อ",
     "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue_txt": {
+    "message": "ดำเนินการต่อ",
+    "description": "Continue button label."
   },
   "continue": {
     "message": "ดำเนินการต่อ",
@@ -52,51 +60,83 @@
     "description": "Disconnect VPN button text"
   },
   "dont_see_it": {
-    "message": "ยังไม่เห็นใช่ไหม?",
+    "message": "ไม่เห็นใช่ไหม?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "forgot_password": {
+    "message": "ลืมรหัสผ่านใช่หรือไม่?",
+    "description": "Forgot your password?"
+  },
   "forgot_your_password": {
-    "message": "ลืมรหัสผ่าน?",
+    "message": "ลืมรหัสผ่านใช่หรือไม่?",
     "description": "Forgot your password?"
   },
   "get_started": {
-    "message": "เริ่มต้น",
-    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+    "message": "เริ่มต้นใช้งาน",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen."
   },
   "its_nice_to_see_you_again": {
-    "message": "ดีใจที่ได้พบคุณอีกครั้ง",
-    "description": "\tGreeting text on Enter user auth password screen.\n"
+    "message": "ดีใจที่ได้เจอคุณอีกครั้ง",
+    "description": "\tGreeting text on Enter user auth password screen."
   },
   "join_urnetwork": {
-    "message": "เข้าร่วม URnetwork",
+    "message": "เข้าร่วมกับ URnetwork",
     "description": "Join URnetwork title on the Create Network screen"
   },
   "launch": {
-    "message": "เริ่มต้น",
+    "message": "เปิดใช้งาน",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
-  "network_name_input_hint": {
-    "message": "ชื่อเครือข่ายต้องมีอย่างน้อย 6 ตัวอักษร",
-    "description": "Hint text indicating the required length for a network name input."
+  "login_verify_header": {
+    "message": "คุณได้รับอีเมลใหม่",
+    "description": "Header for verify screen"
+  },
+  "verify_screen_header": {
+    "message": "คุณได้รับอีเมลใหม่",
+    "description": "Header for verify screen"
+  },
+  "network_name_label": {
+    "message": "ชื่อเครือข่าย",
+    "description": "Label for the network name input field"
   },
   "network_name_input_label": {
     "message": "ชื่อเครือข่าย",
     "description": "Label for the network name input field"
+  },
+  "network_name_length_error": {
+    "message": "ชื่อเครือข่ายของคุณต้องมีตัวอักษรมากกว่า 6 ตัวขึ้นไป",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_hint": {
+    "message": "ชื่อเครือข่ายของคุณต้องมีตัวอักษรมากกว่า 6 ตัวขึ้นไป",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_placeholder": {
+    "message": "ชื่อเครือข่ายของคุณ",
+    "description": "Placeholder text for the network name input field."
   },
   "network_name_input_placeholder": {
     "message": "ชื่อเครือข่ายของคุณ",
     "description": "Placeholder text for the network name input field."
   },
   "network_name_taken": {
-    "message": "ชื่อนี้ถูกใช้ไปแล้ว",
+    "message": "ชื่อเครือข่ายนี้ถูกใช้ไปแล้ว",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "password_label": {
+    "message": "รหัสผ่าน",
+    "description": "Label for the password input field."
   },
   "password": {
     "message": "รหัสผ่าน",
     "description": "Label for the password input field."
   },
+  "password_support_txt": {
+    "message": "รหัสผ่านต้องมีความยาวอย่างน้อย 12 ตัวอักษร",
+    "description": "Hint for password input length requirements."
+  },
   "password_input_length_hint": {
-    "message": "รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร",
+    "message": "รหัสผ่านต้องมีความยาวอย่างน้อย 12 ตัวอักษร",
     "description": "Hint for password input length requirements."
   },
   "promoted": {
@@ -107,12 +147,16 @@
     "message": "ภูมิภาค",
     "description": "Provider list group title for regions"
   },
+  "resend_verify_code": {
+    "message": "ส่งโค้ดใหม่",
+    "description": "Button text to resend the verification code"
+  },
   "resend_code": {
-    "message": "ส่งรหัสอีกครั้ง",
+    "message": "ส่งโค้ดใหม่",
     "description": "Button text to resend the verification code"
   },
   "reset_it": {
-    "message": "รีเซ็ต",
+    "message": "ตั้งใหม่เลยสิ",
     "description": "Button text for resetting password"
   },
   "retry": {
@@ -128,12 +172,12 @@
     "description": "Search providers input placeholder text"
   },
   "something_went_wrong": {
-    "message": "เกิดข้อผิดพลาดบางอย่าง",
+    "message": "มีบางอย่างผิดปกติ",
     "description": "Something went wrong error message"
   },
   "stay_completely_private_and_anonymous": {
     "message": "รักษาความเป็นส่วนตัวและไม่เปิดเผยตัวตนอย่างสมบูรณ์",
-    "description": "Used as a headline in the Initial Auth carousel.\n"
+    "description": "Used as a headline in the Initial Auth carousel."
   },
   "terms_checkbox": {
     "message": "ฉันยอมรับ{terms_start}ข้อกำหนดและบริการ{terms_end}และ{privacy_start}นโยบายความเป็นส่วนตัว{privacy_end}ของ URnetwork",
@@ -141,14 +185,14 @@
   },
   "user_auth_input_label": {
     "message": "อีเมลหรือหมายเลขโทรศัพท์",
-    "description": "Label for the user authentication input field.\n"
+    "description": "Label for the user authentication input field."
   },
   "user_auth_input_placeholder": {
     "message": "ป้อนอีเมลหรือหมายเลขโทรศัพท์ของคุณ",
-    "description": "Placeholder text for the user authentication input field.\n"
+    "description": "Placeholder text for the user authentication input field."
   },
   "verify_explanation": {
-    "message": "บอกเราว่าคุณเป็นใครจริง ๆ ป้อนรหัสที่เราส่งให้คุณเพื่อยืนยันตัวตนของคุณ",
+    "message": "บอกเราว่าคุณคือใคร ป้อนรหัสที่เราส่งให้คุณเพื่อยืนยันตัวตนของคุณ",
     "description": "Sub header text explaining why verification is needed."
   },
   "verify_input_invalid": {
@@ -158,9 +202,5 @@
   "verify_input_label": {
     "message": "รหัสยืนยัน",
     "description": "Label for the verification code input field"
-  },
-  "verify_screen_header": {
-    "message": "คุณมีจดหมาย",
-    "description": "Header for verify screen"
   }
 }

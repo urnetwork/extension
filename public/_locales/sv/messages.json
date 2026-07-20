@@ -1,206 +1,206 @@
 {
   "access_auth_code_instructions": {
-    "message": "인증 코드를 받으려면 계정을 만들고 {link}ur.io{/link}에 로그인하세요. 계정 -> 설정 -> 인증 코드 생성/복사 -> 붙여넣기 -> 완료!",
+    "message": "För att komma åt din autentiseringskod, skapa ett konto och logga in på {link}ur.io{/link}. Gå till Konto -> Inställningar -> Skapa/Kopiera autentiseringskod -> Klistra in -> Klart!",
     "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
   },
   "auth_code_input_invalid": {
-    "message": "인증 코드가 잘못되었거나 만료되었습니다. 유효한 인증 코드를 받으려면 ur.io에 로그인하세요.",
+    "message": "Autentiseringskoden är ogiltig eller har gått ut. Logga in på ur.io för att få en giltig kod.",
     "description": "Invalid auth code input error message"
   },
   "auth_code_input_label": {
-    "message": "인증 코드",
+    "message": "Autentiseringskod",
     "description": "Auth code input label"
   },
   "authentication_code_input_placeholder": {
-    "message": "일회용 인증 코드를 입력하세요",
+    "message": "Ange din engångsautentiseringskod",
     "description": "Placeholder text for the authentication code input field"
   },
   "auth_code_input_placeholder": {
-    "message": "일회용 인증 코드를 입력하세요",
+    "message": "Ange din engångsautentiseringskod",
     "description": "Placeholder text for the authentication code input field"
   },
   "back": {
-    "message": "뒤로",
+    "message": "Tillbaka",
     "description": "\tButton text for going back to the previous screen."
   },
   "best_available_provider": {
-    "message": "최상의 사용 가능한 제공자",
+    "message": "Bästa tillgängliga leverantör",
     "description": "VPN providers list option to select the best available provider"
   },
   "best_matches": {
-    "message": "최고의 일치",
+    "message": "Bästa träffar",
     "description": "Label for a list or section showing the best matching results."
   },
   "cities": {
-    "message": "도시",
+    "message": "Städer",
     "description": "Provider list group title for cities"
   },
   "connect": {
-    "message": "연결",
+    "message": "Anslut",
     "description": "Button text to connect to URnetwork VPN"
   },
   "continue_txt": {
-    "message": "계속",
+    "message": "Fortsätt",
     "description": "Continue button label."
   },
   "continue": {
-    "message": "계속",
+    "message": "Fortsätt",
     "description": "Continue button label."
   },
   "countries": {
-    "message": "국가",
+    "message": "Länder",
     "description": "Provider list group title for countries"
   },
   "devices": {
-    "message": "기기",
+    "message": "Enheter",
     "description": "Provider list group title for devices"
   },
   "disconnect": {
-    "message": "연결 해제",
+    "message": "Koppla från",
     "description": "Disconnect VPN button text"
   },
   "dont_see_it": {
-    "message": "메일이 보이지 않나요?",
+    "message": "Ser du det inte?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
   "forgot_password": {
-    "message": "비밀번호를 잊으셨나요?",
+    "message": "Glömt ditt lösenord?",
     "description": "Forgot your password?"
   },
   "forgot_your_password": {
-    "message": "비밀번호를 잊으셨나요?",
+    "message": "Glömt ditt lösenord?",
     "description": "Forgot your password?"
   },
   "get_started": {
-    "message": "시작하기",
+    "message": "Kom igång",
     "description": "Button text for beginning the login or create network process used on the Initial Auth screen."
   },
   "its_nice_to_see_you_again": {
-    "message": "다시 만나서 반가워요",
+    "message": "Trevligt att se dig igen",
     "description": "\tGreeting text on Enter user auth password screen."
   },
   "join_urnetwork": {
-    "message": "가입하기 URnetwork",
+    "message": "Gå med i URnetwork",
     "description": "Join URnetwork title on the Create Network screen"
   },
   "launch": {
-    "message": "실행",
+    "message": "Starta",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
   "login_verify_header": {
-    "message": "메일을 확인해주세요",
+    "message": "Du har fått e-post",
     "description": "Header for verify screen"
   },
   "verify_screen_header": {
-    "message": "메일을 확인해주세요",
+    "message": "Du har fått e-post",
     "description": "Header for verify screen"
   },
   "network_name_label": {
-    "message": "네트워크 이름",
+    "message": "Nätverksnamn",
     "description": "Label for the network name input field"
   },
   "network_name_input_label": {
-    "message": "네트워크 이름",
+    "message": "Nätverksnamn",
     "description": "Label for the network name input field"
   },
   "network_name_length_error": {
-    "message": "네트워크 이름은 6자 이상이어야 합니다",
+    "message": "Nätverksnamn måste vara minst 6 tecken långa",
     "description": "Hint text indicating the required length for a network name input."
   },
   "network_name_input_hint": {
-    "message": "네트워크 이름은 6자 이상이어야 합니다",
+    "message": "Nätverksnamn måste vara minst 6 tecken långa",
     "description": "Hint text indicating the required length for a network name input."
   },
   "network_name_placeholder": {
-    "message": "당신의 네트워크 이름",
+    "message": "Ditt nätverksnamn",
     "description": "Placeholder text for the network name input field."
   },
   "network_name_input_placeholder": {
-    "message": "당신의 네트워크 이름",
+    "message": "Ditt nätverksnamn",
     "description": "Placeholder text for the network name input field."
   },
   "network_name_taken": {
-    "message": "이 네트워크 이름은 이미 사용 중입니다",
+    "message": "Detta nätverksnamn är redan taget",
     "description": "Error for network name input to display when a network name is already taken."
   },
   "password_label": {
-    "message": "비밀번호",
+    "message": "Lösenord",
     "description": "Label for the password input field."
   },
   "password": {
-    "message": "비밀번호",
+    "message": "Lösenord",
     "description": "Label for the password input field."
   },
   "password_support_txt": {
-    "message": "비밀번호는 최소 12자 이상이어야 합니다",
+    "message": "Lösenordet måste vara minst 12 tecken",
     "description": "Hint for password input length requirements."
   },
   "password_input_length_hint": {
-    "message": "비밀번호는 최소 12자 이상이어야 합니다",
+    "message": "Lösenordet måste vara minst 12 tecken",
     "description": "Hint for password input length requirements."
   },
   "promoted": {
-    "message": "홍보됨",
+    "message": "Utvalda",
     "description": "VPN providers list option for promoted providers"
   },
   "regions": {
-    "message": "지역",
+    "message": "Regioner",
     "description": "Provider list group title for regions"
   },
   "resend_verify_code": {
-    "message": "코드 재전송",
+    "message": "Skicka kod igen",
     "description": "Button text to resend the verification code"
   },
   "resend_code": {
-    "message": "코드 재전송",
+    "message": "Skicka kod igen",
     "description": "Button text to resend the verification code"
   },
   "reset_it": {
-    "message": "재설정",
+    "message": "Återställ",
     "description": "Button text for resetting password"
   },
   "retry": {
-    "message": "다시 시도",
+    "message": "Försök igen",
     "description": "Retry action label"
   },
   "search_providers_input_label": {
-    "message": "공급자 검색",
+    "message": "Sök leverantörer",
     "description": "Search providers input label"
   },
   "search_providers_input_placeholder": {
-    "message": "국가, 주, 도시 검색...",
+    "message": "Sök länder, delstater, städer...",
     "description": "Search providers input placeholder text"
   },
   "something_went_wrong": {
-    "message": "문제가 발생했습니다.",
+    "message": "Något gick fel.",
     "description": "Something went wrong error message"
   },
   "stay_completely_private_and_anonymous": {
-    "message": "완전히 비공개 및 익명으로 유지하세요",
+    "message": "Förbli helt privat och anonym",
     "description": "Used as a headline in the Initial Auth carousel."
   },
   "terms_checkbox": {
-    "message": "URnetwork의 {terms_start}이용 약관{terms_end} 및 {privacy_start}개인정보 보호정책{privacy_end}에 동의합니다",
+    "message": "Jag godkänner URnetworks {terms_start}Villkor och Tjänster{terms_end} och {privacy_start}Integritetspolicy{privacy_end}",
     "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
   },
   "user_auth_input_label": {
-    "message": "이메일 또는 전화번호",
+    "message": "E-post eller telefonnummer",
     "description": "Label for the user authentication input field."
   },
   "user_auth_input_placeholder": {
-    "message": "이메일 또는 전화번호를 입력하세요",
+    "message": "Ange din e-postadress eller ditt telefonnummer",
     "description": "Placeholder text for the user authentication input field."
   },
   "verify_explanation": {
-    "message": "실제 신원을 알려주세요. 본인 확인을 위해 보내드린 코드를 입력해주세요.",
+    "message": "Berätta för oss vem du verkligen är. Ange koden vi skickade för att verifiera din identitet.",
     "description": "Sub header text explaining why verification is needed."
   },
   "verify_input_invalid": {
-    "message": "인증 코드 인증에 문제가 발생했습니다.",
+    "message": "Det uppstod ett problem vid autentiseringen av din verifieringskod.",
     "description": "Error message shown when the verification code input is invalid."
   },
   "verify_input_label": {
-    "message": "인증 코드",
+    "message": "Verifieringskod",
     "description": "Label for the verification code input field"
   }
 }

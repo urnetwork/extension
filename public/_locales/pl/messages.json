@@ -1,6 +1,6 @@
 {
   "access_auth_code_instructions": {
-    "message": "Aby uzyskać dostęp do swojego kodu uwierzytelniającego, utwórz konto i zaloguj się na {link}ur.io{/link}. Po zalogowaniu skopiuj kod uwierzytelniający i użyj go do zalogowania się w rozszerzeniu.",
+    "message": "Aby uzyskać dostęp do swojego kodu uwierzytelniającego, utwórz konto i zaloguj się na {link}ur.io{/link}. Przejdź do Konto -> Ustawienia -> Utwórz/Skopiuj kod uwierzytelniający -> Wklej -> Gotowe!",
     "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
   },
   "auth_code_input_invalid": {
@@ -11,13 +11,17 @@
     "message": "Kod uwierzytelniający",
     "description": "Auth code input label"
   },
+  "authentication_code_input_placeholder": {
+    "message": "Wpisz swój jednorazowy kod uwierzytelniający",
+    "description": "Placeholder text for the authentication code input field"
+  },
   "auth_code_input_placeholder": {
     "message": "Wpisz swój jednorazowy kod uwierzytelniający",
     "description": "Placeholder text for the authentication code input field"
   },
   "back": {
     "message": "Wstecz",
-    "description": "\tButton text for going back to the previous screen.\n"
+    "description": "\tButton text for going back to the previous screen."
   },
   "best_available_provider": {
     "message": "Najlepszy dostępny dostawca",
@@ -35,6 +39,10 @@
     "message": "Połącz",
     "description": "Button text to connect to URnetwork VPN"
   },
+  "continue_txt": {
+    "message": "Kontynuuj",
+    "description": "Continue button label."
+  },
   "continue": {
     "message": "Kontynuuj",
     "description": "Continue button label."
@@ -48,24 +56,28 @@
     "description": "Provider list group title for devices"
   },
   "disconnect": {
-    "message": "Odłącz",
+    "message": "Rozłącz",
     "description": "Disconnect VPN button text"
   },
   "dont_see_it": {
-    "message": "Nie widzisz tego?",
+    "message": "Nie widzisz go?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
+  },
+  "forgot_password": {
+    "message": "Zapomniałeś hasła?",
+    "description": "Forgot your password?"
   },
   "forgot_your_password": {
     "message": "Zapomniałeś hasła?",
     "description": "Forgot your password?"
   },
   "get_started": {
-    "message": "Zacznij",
-    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+    "message": "Rozpocznij",
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen."
   },
   "its_nice_to_see_you_again": {
     "message": "Miło cię znowu widzieć",
-    "description": "\tGreeting text on Enter user auth password screen.\n"
+    "description": "\tGreeting text on Enter user auth password screen."
   },
   "join_urnetwork": {
     "message": "Dołącz do URnetwork",
@@ -75,13 +87,33 @@
     "message": "Uruchom",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
-  "network_name_input_hint": {
-    "message": "Nazwy sieci muszą mieć co najmniej 6 znaków",
-    "description": "Hint text indicating the required length for a network name input."
+  "login_verify_header": {
+    "message": "Masz wiadomość",
+    "description": "Header for verify screen"
+  },
+  "verify_screen_header": {
+    "message": "Masz wiadomość",
+    "description": "Header for verify screen"
+  },
+  "network_name_label": {
+    "message": "Nazwa sieci",
+    "description": "Label for the network name input field"
   },
   "network_name_input_label": {
     "message": "Nazwa sieci",
     "description": "Label for the network name input field"
+  },
+  "network_name_length_error": {
+    "message": "Nazwy sieci muszą mieć co najmniej 6 znaków.",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_hint": {
+    "message": "Nazwy sieci muszą mieć co najmniej 6 znaków.",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_placeholder": {
+    "message": "Nazwa twojej sieci",
+    "description": "Placeholder text for the network name input field."
   },
   "network_name_input_placeholder": {
     "message": "Nazwa twojej sieci",
@@ -91,9 +123,17 @@
     "message": "Ta nazwa sieci jest już zajęta",
     "description": "Error for network name input to display when a network name is already taken."
   },
+  "password_label": {
+    "message": "Hasło",
+    "description": "Label for the password input field."
+  },
   "password": {
     "message": "Hasło",
     "description": "Label for the password input field."
+  },
+  "password_support_txt": {
+    "message": "Hasło musi mieć co najmniej 12 znaków",
+    "description": "Hint for password input length requirements."
   },
   "password_input_length_hint": {
     "message": "Hasło musi mieć co najmniej 12 znaków",
@@ -107,12 +147,16 @@
     "message": "Regiony",
     "description": "Provider list group title for regions"
   },
+  "resend_verify_code": {
+    "message": "Wyślij kod ponownie",
+    "description": "Button text to resend the verification code"
+  },
   "resend_code": {
     "message": "Wyślij kod ponownie",
     "description": "Button text to resend the verification code"
   },
   "reset_it": {
-    "message": "Zresetuj",
+    "message": "Zresetuj je",
     "description": "Button text for resetting password"
   },
   "retry": {
@@ -128,12 +172,12 @@
     "description": "Search providers input placeholder text"
   },
   "something_went_wrong": {
-    "message": "Coś poszło nie tak",
+    "message": "Coś poszło nie tak.",
     "description": "Something went wrong error message"
   },
   "stay_completely_private_and_anonymous": {
     "message": "Pozostań całkowicie prywatny i anonimowy",
-    "description": "Used as a headline in the Initial Auth carousel.\n"
+    "description": "Used as a headline in the Initial Auth carousel."
   },
   "terms_checkbox": {
     "message": "Zgadzam się z {terms_start}Warunkami i Usługami{terms_end} oraz {privacy_start}Polityką Prywatności{privacy_end} URnetwork",
@@ -141,14 +185,14 @@
   },
   "user_auth_input_label": {
     "message": "E-mail lub numer telefonu",
-    "description": "Label for the user authentication input field.\n"
+    "description": "Label for the user authentication input field."
   },
   "user_auth_input_placeholder": {
     "message": "Wprowadź swój e-mail lub numer telefonu",
-    "description": "Placeholder text for the user authentication input field.\n"
+    "description": "Placeholder text for the user authentication input field."
   },
   "verify_explanation": {
-    "message": "Powiedz nam, kim naprawdę jesteś. Wprowadź kod, który wysłaliśmy, aby zweryfikować swoją tożsamość.",
+    "message": "Powiedz nam, kim naprawdę jesteś. Wprowadź kod, który wysłaliśmy, aby zweryfikować Twoją tożsamość.",
     "description": "Sub header text explaining why verification is needed."
   },
   "verify_input_invalid": {
@@ -158,9 +202,5 @@
   "verify_input_label": {
     "message": "Kod weryfikacyjny",
     "description": "Label for the verification code input field"
-  },
-  "verify_screen_header": {
-    "message": "Masz wiadomość",
-    "description": "Header for verify screen"
   }
 }
