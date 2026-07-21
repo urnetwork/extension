@@ -1,6 +1,6 @@
 {
   "access_auth_code_instructions": {
-    "message": "To access your auth code, create an account and sign-in to {link}ur.io{/link}. Once signed in, copy an auth code and use it to login to the extension.",
+    "message": "To Access your Auth Code, create an account and sign in to {link}ur.io{/link}. Head over to Account -> Settings -> Create/Copy Auth code -> Paste -> UR In!",
     "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
   },
   "auth_code_input_invalid": {
@@ -11,13 +11,17 @@
     "message": "Authentication Code",
     "description": "Auth code input label"
   },
+  "authentication_code_input_placeholder": {
+    "message": "Enter your one-time auth code",
+    "description": "Placeholder text for the authentication code input field"
+  },
   "auth_code_input_placeholder": {
     "message": "Enter your one-time auth code",
     "description": "Placeholder text for the authentication code input field"
   },
   "back": {
     "message": "Back",
-    "description": "\tButton text for going back to the previous screen.\n"
+    "description": "\tButton text for going back to the previous screen."
   },
   "best_available_provider": {
     "message": "Best available provider",
@@ -34,6 +38,10 @@
   "connect": {
     "message": "Connect",
     "description": "Button text to connect to URnetwork VPN"
+  },
+  "continue_txt": {
+    "message": "Continue",
+    "description": "Continue button label."
   },
   "continue": {
     "message": "Continue",
@@ -55,17 +63,21 @@
     "message": "Don't see it?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "forgot_password": {
+    "message": "Forgot your password?",
+    "description": "Forgot your password?"
+  },
   "forgot_your_password": {
     "message": "Forgot your password?",
     "description": "Forgot your password?"
   },
   "get_started": {
     "message": "Get started",
-    "description": "Button text for beginning the login or create network process used on the Initial Auth screen.\n"
+    "description": "Button text for beginning the login or create network process used on the Initial Auth screen."
   },
   "its_nice_to_see_you_again": {
     "message": "It's nice to see you again",
-    "description": "\tGreeting text on Enter user auth password screen.\n"
+    "description": "\tGreeting text on Enter user auth password screen."
   },
   "join_urnetwork": {
     "message": "Join URnetwork",
@@ -75,13 +87,33 @@
     "message": "Launch",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
-  "network_name_input_hint": {
-    "message": "Network names must be 6 characters or more",
-    "description": "Hint text indicating the required length for a network name input."
+  "login_verify_header": {
+    "message": "You've got mail",
+    "description": "Header for verify screen"
+  },
+  "verify_screen_header": {
+    "message": "You've got mail",
+    "description": "Header for verify screen"
+  },
+  "network_name_label": {
+    "message": "Network name",
+    "description": "Label for the network name input field"
   },
   "network_name_input_label": {
     "message": "Network name",
     "description": "Label for the network name input field"
+  },
+  "network_name_length_error": {
+    "message": "Network names must be 6 characters or more",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_input_hint": {
+    "message": "Network names must be 6 characters or more",
+    "description": "Hint text indicating the required length for a network name input."
+  },
+  "network_name_placeholder": {
+    "message": "Your network name",
+    "description": "Placeholder text for the network name input field."
   },
   "network_name_input_placeholder": {
     "message": "Your network name",
@@ -91,9 +123,17 @@
     "message": "This network name is already taken",
     "description": "Error for network name input to display when a network name is already taken."
   },
+  "password_label": {
+    "message": "Password",
+    "description": "Label for the password input field."
+  },
   "password": {
     "message": "Password",
     "description": "Label for the password input field."
+  },
+  "password_support_txt": {
+    "message": "Password must be at least 12 characters",
+    "description": "Hint for password input length requirements."
   },
   "password_input_length_hint": {
     "message": "Password must be at least 12 characters",
@@ -106,6 +146,10 @@
   "regions": {
     "message": "Regions",
     "description": "Provider list group title for regions"
+  },
+  "resend_verify_code": {
+    "message": "Resend code",
+    "description": "Button text to resend the verification code"
   },
   "resend_code": {
     "message": "Resend code",
@@ -128,12 +172,12 @@
     "description": "Search providers input placeholder text"
   },
   "something_went_wrong": {
-    "message": "Something went wrong",
+    "message": "Something went wrong.",
     "description": "Something went wrong error message"
   },
   "stay_completely_private_and_anonymous": {
     "message": "Stay completely private and anonymous",
-    "description": "Used as a headline in the Initial Auth carousel.\n"
+    "description": "Used as a headline in the Initial Auth carousel."
   },
   "terms_checkbox": {
     "message": "I agree to URnetwork's {terms_start}Terms and Services{terms_end} and {privacy_start}Privacy Policy{privacy_end}",
@@ -141,11 +185,11 @@
   },
   "user_auth_input_label": {
     "message": "Email or phone number",
-    "description": "Label for the user authentication input field.\n"
+    "description": "Label for the user authentication input field."
   },
   "user_auth_input_placeholder": {
     "message": "Enter your email or phone number",
-    "description": "Placeholder text for the user authentication input field.\n"
+    "description": "Placeholder text for the user authentication input field."
   },
   "verify_explanation": {
     "message": "Tell us who you really are. Enter the code we sent you to verify your identity.",
@@ -158,9 +202,5 @@
   "verify_input_label": {
     "message": "Verification code",
     "description": "Label for the verification code input field"
-  },
-  "verify_screen_header": {
-    "message": "You've got mail",
-    "description": "Header for verify screen"
   }
 }

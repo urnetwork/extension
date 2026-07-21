@@ -1,24 +1,17 @@
 import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
 import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "../utils/pac-script";
-import { runHealthCheck, getSortedSlots, getStoredHealth } from "../utils/node-health";
-import { getKillSwitch, setKillSwitch } from "../utils/kill-switch";
+import { runHealthCheck, getSortedSlots } from "../utils/node-health";
+import { getKillSwitch } from "../utils/kill-switch";
+import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
+import { isAllowedOrigin } from "../utils/origins";
+import { initBridge, notifySessionChanged, handleExtensionLocationChange } from "../bridge/background";
 import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
 
-const ALLOWED_ORIGINS = ["ur.io", "ur.network", "localhost"];
 const HEALTH_ALARM_NAME = "node-health-check";
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
-function isAllowedOrigin(url: string | undefined): boolean {
-	if (!url) return false;
-	try {
-		const { hostname } = new URL(url);
-		return ALLOWED_ORIGINS.some(
-			(domain) => hostname === domain || hostname.endsWith(`.${domain}`),
-		);
-	} catch {
-		return false;
-	}
-}
+// app content-channel bridge (ur.io app ↔ extension)
+initBridge();
 
 function isFirefox(): boolean {
 	return Boolean((globalThis as any).browser?.proxy?.onRequest);
@@ -278,7 +271,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 		proxyManager
 			.enable(message.config as ProxyConfig)
-			.then(() => sendResponse({ success: true }))
+			.then(() => {
+				sendResponse({ success: true });
+				notifySessionChanged("connect");
+			})
 			.catch((err: Error) => {
 				console.error("Failed to enable VPN:", err);
 				sendResponse({ success: false, error: err.message });
@@ -290,7 +286,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	if (message.type === "DISABLE_VPN") {
 		proxyManager
 			.disable()
-			.then(() => sendResponse({ success: true }))
+			.then(() => {
+				sendResponse({ success: true });
+				notifySessionChanged("disconnect");
+			})
 			.catch((err: Error) => {
 				console.error("Failed to disable VPN:", err);
 				sendResponse({ success: false, error: err.message });
@@ -307,7 +306,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 		proxyManager
 			.swap(message.config as ProxyConfig)
-			.then(() => sendResponse({ success: true }))
+			.then(() => {
+				sendResponse({ success: true });
+				notifySessionChanged("renew");
+			})
 			.catch((err: Error) => {
 				console.error("Failed to swap proxy:", err);
 				sendResponse({ success: false, error: err.message });
@@ -347,6 +349,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 				sendResponse({ success: false, error: chrome.runtime.lastError.message });
 			} else {
 				sendResponse({ success: true });
+				notifySessionChanged("connect");
 			}
 		});
 
@@ -357,7 +360,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		chrome.proxy.settings.set(
 			{ value: { mode: "direct" }, scope: "regular" },
 			() => {
-				sendResponse({ success: chrome.runtime.lastError == null });
+				const success = chrome.runtime.lastError == null;
+				sendResponse({ success });
+				if (success) notifySessionChanged("disconnect");
 			},
 		);
 		return true;
@@ -371,6 +376,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		try {
 			proxyManager.enableMultiIp(message.slots);
 			sendResponse({ success: true });
+			notifySessionChanged("connect");
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : "Unknown error";
 			sendResponse({ success: false, error: msg });
@@ -381,36 +387,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	if (message.type === "DISABLE_FIREFOX_MULTI_IP") {
 		proxyManager.disableMultiIp();
 		sendResponse({ success: true });
+		notifySessionChanged("disconnect");
 		return true;
 	}
 
 	if (message.type === "SET_KILL_SWITCH") {
 		const enabled = Boolean(message.enabled);
-		(async () => {
-			await setKillSwitch(enabled);
-			proxyManager.setKillSwitchState(enabled);
-			// Regenerate PAC on Chrome if VPN is active in pac mode
-			const state = proxyManager.getState();
-			if (state.enabled && state.mode === "pac" && !isFirefox()) {
-				const stored = await chrome.storage.local.get(MULTI_IP_SLOTS_KEY);
-				const raw = stored[MULTI_IP_SLOTS_KEY] as string | undefined;
-				if (raw) {
-					try {
-						const slots = JSON.parse(raw) as PacSlot[];
-						const health = await getStoredHealth();
-						const sorted = getSortedSlots(slots, health);
-						const pacScript = buildPacScript(sorted, { killSwitch: enabled });
-						const dataUrl = pacScriptToDataUrl(pacScript);
-						chrome.proxy.settings.set({
-							value: { mode: "pac_script", pacScript: { url: dataUrl } },
-							scope: "regular",
-						});
-					} catch { /* best effort */ }
-				}
-			}
-
-			sendResponse({ success: true });
-		})();
+		applyKillSwitchSetting(enabled)
+			.then(() => sendResponse({ success: true }))
+			.catch((err: Error) => {
+				console.error("Failed to set kill switch:", err);
+				sendResponse({ success: false, error: err.message });
+			});
 		return true;
 	}
 
@@ -418,6 +406,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		getKillSwitch().then((enabled) => {
 			sendResponse({ success: true, enabled });
 		});
+		return true;
+	}
+
+	// The popup changed the connect location. If an app tab is attached, the
+	// change is delegated to its DeviceRemote (device-rpc, no proxy reconnect);
+	// otherwise the popup falls back to a normal connect/swap. See bridge.ts.
+	if (message.type === "CHANGE_LOCATION") {
+		handleExtensionLocationChange(
+			typeof message.locationId === "string" ? message.locationId : null,
+			typeof message.name === "string" ? message.name : undefined,
+		)
+			.then((r) => sendResponse({ success: true, delegated: r.delegated }))
+			.catch((err: Error) => sendResponse({ success: false, error: err.message }));
 		return true;
 	}
 

@@ -20,6 +20,11 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
+			// elements is maintained in-repo under elements/ and consumed
+			// directly from source
+			"@urnetwork/elements/styles.css": `${path.resolve(__dirname, "elements/src/index.css")}`,
+			"@urnetwork/elements/react": `${path.resolve(__dirname, "elements/src/react/index.ts")}`,
+			"@urnetwork/elements/components": `${path.resolve(__dirname, "elements/src/components/index.ts")}`,
 			"@": `${path.resolve(__dirname, "src")}`,
 		},
 	},

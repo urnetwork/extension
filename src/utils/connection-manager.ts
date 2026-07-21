@@ -1,8 +1,10 @@
-import type { ConnectLocation, AuthNetworkClientArgs } from "node_modules/@urnetwork/sdk-js/dist/generated";
+import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
 import { parseByJwtClientId } from "@urnetwork/sdk-js/react";
 import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "./pac-script";
 import { chromeStorageAdapter } from "./storage-adapter";
 import { getKillSwitch } from "./kill-switch";
+import { buildAuthParams } from "./auth-params";
+import { clearBridgeSession } from "../bridge/session";
 
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
@@ -20,12 +22,15 @@ export interface ConnectionManagerCallbacks {
 	onError: (message: string | null) => void;
 }
 
-type AuthNetworkClientFn = (args: AuthNetworkClientArgs) => Promise<{
+type AuthNetworkClientFn = (args: ReturnType<typeof buildAuthParams>) => Promise<{
 	by_client_jwt?: string;
 	proxy_config_result: {
 		auth_token?: string;
 		proxy_host?: string;
 		https_proxy_port?: number;
+		// device-rpc endpoint base for the app bridge (https://api.<proxy_host>:<api_port>)
+		api_base_url?: string;
+		api_port?: number;
 		expiration_time: string;
 		keepalive_seconds: number;
 	} | null;
@@ -54,39 +59,6 @@ let lastPingAt = 0;
 
 function isFirefox(): boolean {
 	return Boolean((globalThis as any).browser?.proxy?.onRequest);
-}
-
-function buildAuthParams(location?: ConnectLocation): AuthNetworkClientArgs {
-	const locationConfig = location
-		? {
-				connect_location_id: {
-					location_id: location.connect_location_id?.location_id,
-					location_group_id: location.connect_location_id?.location_group_id,
-				},
-				stable: true,
-				strong_privacy: true,
-			}
-		: {
-				connect_location_id: { best_available: true },
-				stable: true,
-				strong_privacy: true,
-			};
-
-	return {
-		description: "",
-		device_spec: "",
-		proxy_config: {
-			lock_caller_ip: false,
-			lock_ip_list: [],
-			enable_socks: true,
-			enable_http: true,
-			http_require_auth: false,
-			initial_device_state: {
-				location: locationConfig,
-				performance_profile: null,
-			},
-		},
-	};
 }
 
 export class ConnectionManager {
@@ -152,6 +124,7 @@ export class ConnectionManager {
 			this.multiClientIds = [];
 			await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
 			await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
+			await clearBridgeSession();
 		} catch {
 			// best-effort
 		}
