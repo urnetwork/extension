@@ -1,11 +1,10 @@
 import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
 import { parseByJwtClientId } from "@urnetwork/sdk-js/react";
-import type { ProxyConfig } from "./proxy-manager";
 import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "./pac-script";
 import { chromeStorageAdapter } from "./storage-adapter";
 import { getKillSwitch } from "./kill-switch";
 import { buildAuthParams } from "./auth-params";
-import { saveBridgeSession, clearBridgeSession } from "../bridge/session";
+import { clearBridgeSession } from "../bridge/session";
 
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
@@ -17,11 +16,9 @@ export type ConnectionStatus =
 	| "reconnecting"
 	| "error";
 
-export type ConnectionMode = "standard" | "multi-ip";
-
 export interface ConnectionManagerCallbacks {
 	onStatusChange: (status: ConnectionStatus) => void;
-	onProxyChange: (config: ProxyConfig | null) => void;
+	onProxyChange: (config: null) => void;
 	onError: (message: string | null) => void;
 }
 
@@ -42,15 +39,11 @@ type AuthNetworkClientFn = (args: ReturnType<typeof buildAuthParams>) => Promise
 
 type RemoveNetworkClientFn = (clientId: string) => Promise<{ error?: unknown }>;
 
-// Standard mode storage key (singular — matches legacy key used by proxy-manager restore)
-const STORAGE_KEY_CLIENT_ID = "proxy_client_id";
-// Multi-IP mode storage key for the provisioned slot client IDs
 const STORAGE_KEY_MULTI_CLIENT_IDS = "multi_ip_client_ids";
 
 const PING_URL = "https://api-v4.bringyour.com/my-ip-info";
 const PING_TIMEOUT_MS = 5_000;
 const PING_RATE_LIMIT_MS = 500;
-const FALLBACK_KEEPALIVE_S = 30;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAYS_MS = [2_000, 4_000, 8_000, 16_000, 30_000];
 const STARTUP_GRACE_MS = 12_000;
@@ -58,16 +51,11 @@ const PING_FAILURES_FOR_DEGRADED = 2;
 const PING_FAILURES_FOR_RECONNECT = 3;
 const MIN_CONNECTED_MS = 15_000;
 
-// Shared rate-limit timestamp for PING_URL across all ConnectionManager instances
-let lastPingAt = 0;
-
-// Multi-IP provisioning constants
 const MULTI_IP_POOL_SIZE = 5;
 const MULTI_IP_STAGGER_MS = 200;
-// In multi-IP/PAC mode Chrome handles proxy fallback internally — we use a
-// very long ping interval so we don't churn the PAC script and break active
-// connections. Health is verified at reconnect time, not continuously.
-const MULTI_IP_PING_INTERVAL_S = 300; // 5 minutes
+const MULTI_IP_PING_INTERVAL_S = 300;
+
+let lastPingAt = 0;
 
 function isFirefox(): boolean {
 	return Boolean((globalThis as any).browser?.proxy?.onRequest);
@@ -75,7 +63,6 @@ function isFirefox(): boolean {
 
 export class ConnectionManager {
 	private status: ConnectionStatus = "idle";
-	private mode: ConnectionMode = "standard";
 	private location: ConnectLocation | undefined;
 	private authNetworkClient: AuthNetworkClientFn;
 	private removeNetworkClient: RemoveNetworkClientFn;
@@ -89,9 +76,6 @@ export class ConnectionManager {
 	private destroyed = false;
 	private connectedAt = 0;
 
-	// Standard mode: single client ID
-	private clientId: string | null = null;
-	// Multi-IP mode: all provisioned slot client IDs
 	private multiClientIds: string[] = [];
 
 	constructor(
@@ -108,17 +92,12 @@ export class ConnectionManager {
 		return this.status;
 	}
 
-	getMode(): ConnectionMode {
-		return this.mode;
-	}
-
 	// ── public API ─────────────────────────────────────────────────────────────
 
-	async connect(location?: ConnectLocation, mode: ConnectionMode = "standard"): Promise<void> {
+	async connect(location?: ConnectLocation): Promise<void> {
 		if (this.operationLock) return;
 		this.operationLock = true;
 		this.location = location;
-		this.mode = mode;
 		this.reconnectAttempts = 0;
 
 		this.setStatus("connecting");
@@ -126,11 +105,7 @@ export class ConnectionManager {
 		this.clearTimers();
 
 		try {
-			if (mode === "multi-ip") {
-				await this.establishMultiIpConnection(location);
-			} else {
-				await this.establishConnection(location);
-			}
+			await this.establishMultiIpConnection(location);
 		} finally {
 			if (!this.destroyed) this.operationLock = false;
 		}
@@ -143,27 +118,13 @@ export class ConnectionManager {
 		this.clearTimers();
 
 		try {
-			if (this.mode === "multi-ip") {
-				const disableType = isFirefox() ? "DISABLE_FIREFOX_MULTI_IP" : "DISABLE_TAB_ISOLATION_PAC";
-				await chrome.runtime.sendMessage({ type: disableType });
-				await this.releaseMultiClientIds(this.multiClientIds);
-				this.multiClientIds = [];
-				await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
-				await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
-				await clearBridgeSession();
-			} else {
-				await chrome.runtime.sendMessage({ type: "DISABLE_VPN" });
-				if (this.clientId) {
-					try {
-						await this.removeNetworkClient(this.clientId);
-					} catch {
-						// best-effort
-					}
-					this.clientId = null;
-					await chromeStorageAdapter.removeItem(STORAGE_KEY_CLIENT_ID);
-				}
-				await clearBridgeSession();
-			}
+			const disableType = isFirefox() ? "DISABLE_FIREFOX_MULTI_IP" : "DISABLE_TAB_ISOLATION_PAC";
+			await chrome.runtime.sendMessage({ type: disableType });
+			await this.releaseMultiClientIds(this.multiClientIds);
+			this.multiClientIds = [];
+			await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
+			await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
+			await clearBridgeSession();
 		} catch {
 			// best-effort
 		}
@@ -172,117 +133,21 @@ export class ConnectionManager {
 		this.callbacks.onProxyChange(null);
 	}
 
-	/**
-	 * Take ownership of an already-active proxy session restored from Chrome storage.
-	 * Skips re-authenticating; starts the appropriate health loop immediately.
-	 */
-	reattach(location?: ConnectLocation, mode: ConnectionMode = "standard"): void {
+	reattach(location?: ConnectLocation): void {
 		if (this.destroyed) return;
 		this.location = location;
-		this.mode = mode;
 		this.reconnectAttempts = 0;
 		this.consecutivePingFailures = 0;
 		this.connectedAt = Date.now();
 		this.clearTimers();
 		this.setStatus("connected");
 
-		const intervalS = mode === "multi-ip" ? MULTI_IP_PING_INTERVAL_S : FALLBACK_KEEPALIVE_S;
-		this.pingIntervalId = setInterval(() => this.healthPing(), intervalS * 1_000);
+		this.pingIntervalId = setInterval(() => this.healthPing(), MULTI_IP_PING_INTERVAL_S * 1_000);
 	}
 
 	destroy(): void {
 		this.destroyed = true;
 		this.clearTimers();
-	}
-
-	// ── standard connection ───────────────────────────────────────────────────
-
-	private async establishConnection(location?: ConnectLocation): Promise<void> {
-		const result = await this.authNetworkClient(buildAuthParams(location));
-
-		if (this.destroyed) return;
-
-		if (result.error) {
-			this.setStatus("error");
-			this.callbacks.onError(result.error.message);
-			return;
-		}
-
-		if (!result.by_client_jwt) {
-			this.setStatus("error");
-			this.callbacks.onError("Authentication failed: no client token received");
-			return;
-		}
-
-		const pr = result.proxy_config_result;
-
-		if (!pr?.auth_token || !pr.proxy_host || !pr.https_proxy_port) {
-			this.setStatus("error");
-			this.callbacks.onError("Incomplete proxy configuration received");
-			return;
-		}
-
-		const config: ProxyConfig = {
-			host: `${pr.auth_token}.${pr.proxy_host}`,
-			port: pr.https_proxy_port,
-			scheme: "https",
-		};
-
-		const isRenewal = this.status === "connected" || this.status === "degraded" || this.status === "reconnecting";
-		const msgType = isRenewal ? "SWAP_PROXY" : "ENABLE_VPN";
-
-		const response = await chrome.runtime.sendMessage({ type: msgType, config });
-
-		if (this.destroyed) return;
-
-		if (!response?.success) {
-			this.setStatus("error");
-			this.callbacks.onError(response?.error ?? "Failed to apply proxy settings");
-			return;
-		}
-
-		const newClientId = parseByJwtClientId(result.by_client_jwt);
-
-		// Release the old client only if it's being replaced
-		if (this.clientId && this.clientId !== newClientId) {
-			this.removeNetworkClient(this.clientId).catch(() => {});
-		}
-		this.clientId = newClientId;
-		await chromeStorageAdapter.setItem(STORAGE_KEY_CLIENT_ID, newClientId);
-
-		// Record the session for the app bridge: the ur.io app uses the signed
-		// proxy id (auth_token) + api base url to attach a DeviceRemote to the
-		// hosted device over the device-rpc websocket.
-		await saveBridgeSession({
-			clientId: newClientId,
-			signedProxyId: pr.auth_token,
-			proxyHost: pr.proxy_host,
-			httpsProxyPort: pr.https_proxy_port,
-			apiBaseUrl:
-				pr.api_base_url ??
-				(pr.api_port ? `https://api.${pr.proxy_host}:${pr.api_port}` : null),
-			expirationTime: pr.expiration_time,
-			locationId: this.location?.connect_location_id?.location_id ?? null,
-		});
-
-		this.callbacks.onProxyChange(config);
-
-		// Schedule proactive renewal at 80% of remaining lifetime
-		const expiresAt = new Date(pr.expiration_time).getTime();
-		const lifetime = expiresAt - Date.now();
-		if (lifetime > 0) {
-			const renewIn = Math.floor(lifetime * 0.8);
-			this.renewTimeoutId = setTimeout(() => this.silentRenew(), renewIn);
-		}
-
-		const pingIntervalMs = (pr.keepalive_seconds ?? FALLBACK_KEEPALIVE_S) * 1_000;
-		this.clearPingInterval();
-		this.pingIntervalId = setInterval(() => this.healthPing(), pingIntervalMs);
-
-		this.setStatus("connected");
-		this.consecutivePingFailures = 0;
-		this.reconnectAttempts = 0;
-		this.connectedAt = Date.now();
 	}
 
 	// ── multi-IP connection ───────────────────────────────────────────────────
@@ -339,7 +204,6 @@ export class ConnectionManager {
 			});
 		}
 
-		// Store slots so the background health check can access them
 		await chrome.storage.local.set({ [MULTI_IP_SLOTS_KEY]: JSON.stringify(slotList) });
 
 		if (this.destroyed) return;
@@ -351,7 +215,6 @@ export class ConnectionManager {
 			return;
 		}
 
-		// Release previous slots, store new ones
 		await this.releaseMultiClientIds(this.multiClientIds);
 		this.multiClientIds = slots.map((s) => s.clientId);
 		await chromeStorageAdapter.setItem(
@@ -364,21 +227,15 @@ export class ConnectionManager {
 		this.reconnectAttempts = 0;
 		this.connectedAt = Date.now();
 
-		// Signal no single proxy config (PAC mode)
 		this.callbacks.onProxyChange(null);
 
-		// Schedule renewal based on actual expiry from first slot.
-		// In PAC mode we re-provision all slots at renewal time to get fresh credentials.
 		const expiresAt = new Date(slots[0].expirationTime).getTime();
 		const lifetime = expiresAt - Date.now();
 		if (lifetime > 0) {
 			const renewIn = Math.floor(lifetime * 0.8);
-			this.renewTimeoutId = setTimeout(() => this.silentRenewMultiIp(), renewIn);
+			this.renewTimeoutId = setTimeout(() => this.silentRenew(), renewIn);
 		}
 
-		// Use a very long ping interval in PAC mode — Chrome handles proxy fallback
-		// internally. Aggressive pinging churns the PAC script and breaks active
-		// page loads. We only ping here to detect a total loss of connectivity.
 		this.clearPingInterval();
 		this.pingIntervalId = setInterval(
 			() => this.healthPing(),
@@ -389,19 +246,6 @@ export class ConnectionManager {
 	// ── silent renewal ────────────────────────────────────────────────────────
 
 	private async silentRenew(): Promise<void> {
-		if (this.destroyed || this.operationLock) return;
-		this.operationLock = true;
-		try {
-			this.clearPingInterval();
-			await this.establishConnection(this.location);
-		} finally {
-			if (!this.destroyed) this.operationLock = false;
-		}
-	}
-
-	// Re-provision all PAC slots with fresh credentials without tearing down Chrome's
-	// current proxy setting — apply the new PAC script atomically over the old one.
-	private async silentRenewMultiIp(): Promise<void> {
 		if (this.destroyed || this.operationLock) return;
 		this.operationLock = true;
 		try {
@@ -433,11 +277,7 @@ export class ConnectionManager {
 			if (this.destroyed || this.operationLock) return;
 			this.operationLock = true;
 			try {
-				if (this.mode === "multi-ip") {
-					await this.establishMultiIpConnection(this.location);
-				} else {
-					await this.establishConnection(this.location);
-				}
+				await this.establishMultiIpConnection(this.location);
 			} finally {
 				if (!this.destroyed) this.operationLock = false;
 			}

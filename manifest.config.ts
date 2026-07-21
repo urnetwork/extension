@@ -32,7 +32,7 @@ export default defineManifest({
 			service_worker: "src/background/index.ts",
 			type: "module",
 		},
-	permissions: ["proxy", "storage", "alarms"],
+	permissions: ["proxy", "storage", "alarms", "tabs", "identity"],
 	// App content-channel bridge: relays window.postMessage from the ur.io app
 	// to the background over a Port. The only page↔extension channel that works
 	// on Firefox too (externally_connectable is Chromium-only for web pages).

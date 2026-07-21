@@ -8,6 +8,7 @@ export function buildAuthParams(location?: ConnectLocation): AuthNetworkClientAr
 		? {
 				connect_location_id: {
 					location_id: location.connect_location_id?.location_id,
+					location_group_id: location.connect_location_id?.location_group_id,
 				},
 				stable: true,
 				strong_privacy: true,
