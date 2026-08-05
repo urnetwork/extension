@@ -95,6 +95,22 @@
     "message": "您有邮件",
     "description": "Header for verify screen"
   },
+  "mock_location_active": {
+    "message": "正在与 {location} 同步",
+    "description": "Status shown while the device location is being synced with a provider. The argument is the provider's city or country."
+  },
+  "mock_location_disclosure_browser_only": {
+    "message": "只有此浏览器中的网页会看到更改后的位置。您设备的位置不会改变。",
+    "description": "Disclosure shown with the browser geolocation override toggle: the simulated location is reported only to pages in this browser, not to the device."
+  },
+  "mock_location_disclosure_sites_can_detect": {
+    "message": "网站能够识别出位置是模拟的，并且可能拒绝运行。",
+    "description": "Disclosure shown with the browser geolocation override toggle: sites can detect a simulated location and may refuse to work."
+  },
+  "mock_location_waiting_for_provider": {
+    "message": "正在等待提供商位置",
+    "description": "Status shown while the mock location feature waits for a connected provider's location to become known."
+  },
   "network_name_label": {
     "message": "网络名称",
     "description": "Label for the network name input field"
@@ -179,9 +195,17 @@
     "message": "保持完全私密和匿名",
     "description": "Used as a headline in the Initial Auth carousel."
   },
+  "sync_device_location_with_provider": {
+    "message": "将设备位置与提供商同步",
+    "description": "Toggle that makes the device (or browser, on the extension) report a connected provider's location instead of the real location. The provider used is the most stable (longest-connected) one."
+  },
   "terms_checkbox": {
     "message": "我同意 URnetwork 的{terms_start}条款和服务{terms_end}以及{privacy_start}隐私政策{privacy_end}",
     "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "use_most_stable_provider": {
+    "message": "使用最稳定的提供商",
+    "description": "Note under the location sync toggle explaining that the most stable (longest-connected) provider's location is used. Doubles as the resting status when no more specific status applies."
   },
   "user_auth_input_label": {
     "message": "邮箱或手机号码",

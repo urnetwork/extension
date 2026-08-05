@@ -9,11 +9,27 @@
 // signed proxy id this service hands back (see APP.md in mmm/ur.io).
 //
 // Verbs: PING, GET_STATUS, GET_USER, GET_SESSION, SETUP, CONNECT, DISCONNECT,
-// GET_KILL_SWITCH, SET_KILL_SWITCH.
+// GET_KILL_SWITCH, SET_KILL_SWITCH, GET_GEO_SYNC, SET_PROVIDER_LOCATIONS.
 // Events (broadcast to every connected ur.io tab): SESSION_CHANGED,
-// USER_CHANGED. Device-state sync intentionally does NOT flow through the
-// bridge — the app subscribes to the device-rpc listeners natively. Wire
-// frame shapes and the port name are defined in protocol.ts.
+// USER_CHANGED, GEO_SYNC_CHANGED. Device-state sync intentionally does NOT
+// flow through the bridge — the app subscribes to the device-rpc listeners
+// natively. Wire frame shapes and the port name are defined in protocol.ts.
+//
+// The one exception to "device state does not flow through the bridge" is
+// SET_PROVIDER_LOCATIONS, and it is a data-source decision, not a sync
+// channel: the geolocation override (content/geo-main.ts) needs the oldest
+// connected provider's coordinates, and only the app holds a DeviceRemote —
+// the extension has no device plane at all. The contract with the app is:
+//
+//   1. on GEO_SYNC_CHANGED {enabled:true} (or a GET_GEO_SYNC answer saying
+//      enabled), the app subscribes to
+//      addConnectedProviderLocationChangeListener and pushes
+//      SET_PROVIDER_LOCATIONS { locations: getConnectedProviderLocations() }
+//      — the sdk's list, oldest connected first, pushed as-is;
+//   2. it pushes again on every change, and stops on {enabled:false}.
+//
+// The extension picks the oldest entry that has coordinates and stores it (see
+// utils/geo-sync.ts). Pushes are ignored while the toggle is off.
 import { proxyManager } from "../utils/proxy-manager";
 import { chromeStorageAdapter } from "../utils/storage-adapter";
 import { BRIDGE_PORT_NAME, type PortRequestFrame } from "./protocol";
@@ -29,6 +45,12 @@ import {
 import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
 import { isAllowedOrigin } from "../utils/origins";
+import {
+	clearGeoSyncPosition,
+	getGeoSyncEnabled,
+	storeProviderLocations,
+} from "../utils/geo-sync";
+import { STORAGE_KEY_GEO_ENABLED } from "../content/geo-protocol";
 import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
 
 const RENEW_ALARM = "urn-bridge-session-renew";
@@ -280,6 +302,10 @@ async function disconnectInternal(
 	await releaseClient(clientId, jwt);
 	await clearBridgeSession();
 	await chromeStorageAdapter.removeItem(STORAGE_KEY_CLIENT_ID);
+	// no connection, no provider: the geolocation override stops reporting a
+	// location that nothing is exiting through any more (the toggle itself is
+	// left as the user set it)
+	await clearGeoSyncPosition();
 
 	const session = await getSessionInfo();
 	broadcast("SESSION_CHANGED", { session, reason });
@@ -389,6 +415,15 @@ async function handleVerb(
 			const enabled = Boolean(payload?.enabled);
 			await applyKillSwitchSetting(enabled);
 			return { enabled };
+		}
+		case "GET_GEO_SYNC": {
+			// the app asks on connect whether it should be pushing provider
+			// locations for the geolocation override
+			return { enabled: await getGeoSyncEnabled() };
+		}
+		case "SET_PROVIDER_LOCATIONS": {
+			const position = await storeProviderLocations(payload?.locations);
+			return { applied: position !== null };
 		}
 		case "SET_LOCATION": {
 			// The app changed the connect location. The hosted device was already
@@ -549,6 +584,13 @@ export function initBridge(): void {
 			getUser()
 				.then((user) => broadcast("USER_CHANGED", { user }))
 				.catch(() => {});
+		}
+		// the popup owns the geolocation override toggle; app tabs learn about it
+		// here so they can start or stop pushing provider locations
+		if (changes[STORAGE_KEY_GEO_ENABLED]) {
+			broadcast("GEO_SYNC_CHANGED", {
+				enabled: changes[STORAGE_KEY_GEO_ENABLED].newValue === true,
+			});
 		}
 	});
 }

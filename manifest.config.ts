@@ -3,6 +3,11 @@ import pkg from "./package.json";
 
 const isFirefox = process.env.BROWSER_TARGET === "firefox";
 
+// `match_origin_as_fallback` is a real MV3 content-script key (Chrome 99+,
+// Firefox 128+) that crxjs's manifest types predate. Spread in so the rest of
+// the literal keeps its type checking.
+const matchOriginAsFallback = { match_origin_as_fallback: true };
+
 export default defineManifest({
 	manifest_version: 3,
 	name: "URnetwork",
@@ -47,6 +52,35 @@ export default defineManifest({
 			js: ["src/bridge/content.ts"],
 			run_at: "document_start",
 			all_frames: false,
+		},
+		// Geolocation override (opt-in, off by default — see utils/geo-sync.ts).
+		// Both files are built outside crxjs by the `crx:geo-content-scripts`
+		// plugin in vite.config.ts and referenced by their final names: crxjs
+		// wraps content scripts in an async dynamic-import loader, which a
+		// MAIN-world script cannot use (no chrome.runtime, page CSP) and which
+		// would forfeit document_start.
+		{
+			// MAIN is the only world the page can see. document_start so the
+			// patch is in place before any page script runs; all_frames because
+			// each same-origin frame is its own realm; match_origin_as_fallback
+			// to reach about:blank / srcdoc / data: frames (Chrome 99+,
+			// Firefox 128+ — the same floor as `world`, which our
+			// strict_min_version already pins).
+			matches: ["<all_urls>"],
+			js: ["geo-main.js"],
+			world: "MAIN",
+			run_at: "document_start",
+			all_frames: true,
+			...matchOriginAsFallback,
+		},
+		{
+			// ISOLATED companion: MAIN has no chrome.*, so this reads the config
+			// out of chrome.storage.local and hands it over the shared DOM.
+			matches: ["<all_urls>"],
+			js: ["geo-config.js"],
+			run_at: "document_start",
+			all_frames: true,
+			...matchOriginAsFallback,
 		},
 	],
 	host_permissions: isFirefox

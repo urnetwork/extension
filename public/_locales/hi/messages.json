@@ -95,6 +95,22 @@
     "message": "आपके पास एक ईमेल है",
     "description": "Header for verify screen"
   },
+  "mock_location_active": {
+    "message": "{location} के साथ सिंक हो रहा है",
+    "description": "Status shown while the device location is being synced with a provider. The argument is the provider's city or country."
+  },
+  "mock_location_disclosure_browser_only": {
+    "message": "बदला हुआ स्थान सिर्फ़ इस ब्राउज़र के पेज देखते हैं। आपके डिवाइस का स्थान नहीं बदलता।",
+    "description": "Disclosure shown with the browser geolocation override toggle: the simulated location is reported only to pages in this browser, not to the device."
+  },
+  "mock_location_disclosure_sites_can_detect": {
+    "message": "साइटें पहचान सकती हैं कि स्थान नकली है और काम करने से मना कर सकती हैं।",
+    "description": "Disclosure shown with the browser geolocation override toggle: sites can detect a simulated location and may refuse to work."
+  },
+  "mock_location_waiting_for_provider": {
+    "message": "प्रदाता के स्थान की प्रतीक्षा हो रही है",
+    "description": "Status shown while the mock location feature waits for a connected provider's location to become known."
+  },
   "network_name_label": {
     "message": "नेटवर्क का नाम",
     "description": "Label for the network name input field"
@@ -179,9 +195,17 @@
     "message": "पूरी तरह से निजी और गुमनाम रहें",
     "description": "Used as a headline in the Initial Auth carousel."
   },
+  "sync_device_location_with_provider": {
+    "message": "डिवाइस का स्थान प्रदाता के साथ सिंक करें",
+    "description": "Toggle that makes the device (or browser, on the extension) report a connected provider's location instead of the real location. The provider used is the most stable (longest-connected) one."
+  },
   "terms_checkbox": {
     "message": "मैं URnetwork की {terms_start}शर्तें और सेवाएं{terms_end} और {privacy_start}गोपनीयता नीति{privacy_end} से सहमत हूं",
     "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "use_most_stable_provider": {
+    "message": "सबसे स्थिर प्रदाता का उपयोग करता है",
+    "description": "Note under the location sync toggle explaining that the most stable (longest-connected) provider's location is used. Doubles as the resting status when no more specific status applies."
   },
   "user_auth_input_label": {
     "message": "ईमेल या फ़ोन नंबर",

@@ -21,6 +21,16 @@ import { chromeStorageAdapter } from "@/utils/storage-adapter";
 import { fetchIpInfo, type IpInfo } from "@/utils/ip-info";
 import { useConnectionManager } from "@/utils/use-connection-manager";
 import { useProviderListEnhanced, type RegionGroup } from "@/utils/use-provider-list-enhanced";
+import {
+	getGeoSyncEnabled,
+	getGeoSyncPosition,
+	setGeoSyncEnabled as persistGeoSyncEnabled,
+} from "@/utils/geo-sync";
+import {
+	STORAGE_KEY_GEO_ENABLED,
+	STORAGE_KEY_GEO_POSITION,
+	type GeoSyncPosition,
+} from "@/content/geo-protocol";
 
 const STORAGE_KEY_LOCATION = "selected_connect_location";
 
@@ -64,6 +74,47 @@ export const ConnectScreen: React.FC = () => {
 		setKillSwitchLocal(next);
 		chrome.runtime.sendMessage({ type: "SET_KILL_SWITCH", enabled: next });
 	}, [killSwitch]);
+
+	// ── location sync (geolocation override) ─────────────────────────────────
+	// Opt-in, off by default. Both pieces of state live in chrome.storage.local
+	// so the content scripts read them directly (see content/geo-config.ts) —
+	// this screen only mirrors them.
+	const [geoSync, setGeoSync] = useState(false);
+	const [geoPosition, setGeoPosition] = useState<GeoSyncPosition | null>(null);
+
+	useEffect(() => {
+		let cancelled = false;
+		Promise.all([getGeoSyncEnabled(), getGeoSyncPosition()]).then(([enabled, position]) => {
+			if (cancelled) return;
+			setGeoSync(enabled);
+			setGeoPosition(position);
+		});
+		const onStorageChanged = (
+			changes: Record<string, chrome.storage.StorageChange>,
+			area: string,
+		) => {
+			if (area !== "local") return;
+			if (changes[STORAGE_KEY_GEO_ENABLED]) {
+				setGeoSync(changes[STORAGE_KEY_GEO_ENABLED].newValue === true);
+			}
+			if (changes[STORAGE_KEY_GEO_POSITION]) {
+				const next = changes[STORAGE_KEY_GEO_POSITION].newValue;
+				setGeoPosition(next && typeof next === "object" ? (next as GeoSyncPosition) : null);
+			}
+		};
+		chrome.storage.onChanged.addListener(onStorageChanged);
+		return () => {
+			cancelled = true;
+			chrome.storage.onChanged.removeListener(onStorageChanged);
+		};
+	}, []);
+
+	const handleGeoSyncToggle = useCallback(() => {
+		const next = !geoSync;
+		setGeoSync(next);
+		if (!next) setGeoPosition(null);
+		persistGeoSyncEnabled(next).catch(() => {});
+	}, [geoSync]);
 
 	useEffect(() => {
 		onProxyChange(() => {});
@@ -279,6 +330,18 @@ export const ConnectScreen: React.FC = () => {
 	const isConnecting = status === "connecting";
 	const isReconnecting = status === "reconnecting" || status === "degraded";
 
+	// The note under the location sync toggle: the resting line describes the
+	// rule (oldest connected provider = the most stable one), and the two live
+	// states replace it once the toggle is on.
+	const geoSyncNote = (() => {
+		if (!geoSync) return getMessage("use_most_stable_provider");
+		if (!geoPosition) return getMessage("mock_location_waiting_for_provider");
+		const place =
+			geoPosition.label || `${geoPosition.lat.toFixed(3)}, ${geoPosition.lon.toFixed(3)}`;
+		const template = getMessage("mock_location_active");
+		return template ? template.replace("{location}", place) : place;
+	})();
+
 	return (
 		<Screen>
 			{/* ── Left Panel: Connection Controls ── */}
@@ -371,6 +434,30 @@ export const ConnectScreen: React.FC = () => {
 								</span>
 							</div>
 							<ToggleSwitch enabled={killSwitch} onToggle={handleKillSwitchToggle} label="Toggle kill switch" />
+						</div>
+
+						{/* Location sync (geolocation override) */}
+						<div className="flex flex-col gap-1">
+							<div className="flex items-center justify-between gap-2">
+								<span className="text-xs font-medium flex-1 min-w-0">
+									{getMessage("sync_device_location_with_provider")}
+								</span>
+								<ToggleSwitch
+									enabled={geoSync}
+									onToggle={handleGeoSyncToggle}
+									label={getMessage("sync_device_location_with_provider")}
+								/>
+							</div>
+							<span className="text-[10px] opacity-60 leading-tight">{geoSyncNote}</span>
+							{/* honest scope: a page-level shim, not a device or browser guarantee */}
+							<span className="text-[10px] opacity-50 leading-tight">
+								{getMessage("mock_location_disclosure_browser_only")}
+							</span>
+							{geoSync && (
+								<span className="text-[10px] opacity-50 leading-tight">
+									{getMessage("mock_location_disclosure_sites_can_detect")}
+								</span>
+							)}
 						</div>
 					</div>
 				</div>

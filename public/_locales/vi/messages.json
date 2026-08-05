@@ -95,6 +95,22 @@
     "message": "Bạn có email mới",
     "description": "Header for verify screen"
   },
+  "mock_location_active": {
+    "message": "Đang đồng bộ với {location}",
+    "description": "Status shown while the device location is being synced with a provider. The argument is the provider's city or country."
+  },
+  "mock_location_disclosure_browser_only": {
+    "message": "Chỉ các trang trong trình duyệt này thấy vị trí đã thay đổi. Vị trí thiết bị của bạn không thay đổi.",
+    "description": "Disclosure shown with the browser geolocation override toggle: the simulated location is reported only to pages in this browser, not to the device."
+  },
+  "mock_location_disclosure_sites_can_detect": {
+    "message": "Các trang web có thể phát hiện vị trí là mô phỏng và có thể từ chối hoạt động.",
+    "description": "Disclosure shown with the browser geolocation override toggle: sites can detect a simulated location and may refuse to work."
+  },
+  "mock_location_waiting_for_provider": {
+    "message": "Đang chờ vị trí nhà cung cấp",
+    "description": "Status shown while the mock location feature waits for a connected provider's location to become known."
+  },
   "network_name_label": {
     "message": "Tên mạng",
     "description": "Label for the network name input field"
@@ -179,9 +195,17 @@
     "message": "Giữ hoàn toàn riêng tư và ẩn danh",
     "description": "Used as a headline in the Initial Auth carousel."
   },
+  "sync_device_location_with_provider": {
+    "message": "Đồng bộ vị trí thiết bị với nhà cung cấp",
+    "description": "Toggle that makes the device (or browser, on the extension) report a connected provider's location instead of the real location. The provider used is the most stable (longest-connected) one."
+  },
   "terms_checkbox": {
     "message": "Tôi đồng ý với {terms_start}Điều khoản và Dịch vụ{terms_end} và {privacy_start}Chính sách Bảo mật{privacy_end} của URnetwork",
     "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "use_most_stable_provider": {
+    "message": "Sử dụng nhà cung cấp ổn định nhất",
+    "description": "Note under the location sync toggle explaining that the most stable (longest-connected) provider's location is used. Doubles as the resting status when no more specific status applies."
   },
   "user_auth_input_label": {
     "message": "Email hoặc số điện thoại",

@@ -95,6 +95,22 @@
     "message": "You've got mail",
     "description": "Header for verify screen"
   },
+  "mock_location_active": {
+    "message": "Syncing with {location}",
+    "description": "Status shown while the device location is being synced with a provider. The argument is the provider's city or country."
+  },
+  "mock_location_disclosure_browser_only": {
+    "message": "Only pages in this browser see the changed location. Your device's location is unchanged.",
+    "description": "Disclosure shown with the browser geolocation override toggle: the simulated location is reported only to pages in this browser, not to the device."
+  },
+  "mock_location_disclosure_sites_can_detect": {
+    "message": "Sites can tell the location is simulated and may refuse to work.",
+    "description": "Disclosure shown with the browser geolocation override toggle: sites can detect a simulated location and may refuse to work."
+  },
+  "mock_location_waiting_for_provider": {
+    "message": "Waiting for a provider location",
+    "description": "Status shown while the mock location feature waits for a connected provider's location to become known."
+  },
   "network_name_label": {
     "message": "Network name",
     "description": "Label for the network name input field"
@@ -179,9 +195,17 @@
     "message": "Stay completely private and anonymous",
     "description": "Used as a headline in the Initial Auth carousel."
   },
+  "sync_device_location_with_provider": {
+    "message": "Sync device location with provider",
+    "description": "Toggle that makes the device (or browser, on the extension) report a connected provider's location instead of the real location. The provider used is the most stable (longest-connected) one."
+  },
   "terms_checkbox": {
     "message": "I agree to URnetwork's {terms_start}Terms and Services{terms_end} and {privacy_start}Privacy Policy{privacy_end}",
     "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
+  },
+  "use_most_stable_provider": {
+    "message": "Use most stable provider",
+    "description": "Note under the location sync toggle explaining that the most stable (longest-connected) provider's location is used. Doubles as the resting status when no more specific status applies."
   },
   "user_auth_input_label": {
     "message": "Email or phone number",
