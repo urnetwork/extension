@@ -12,11 +12,11 @@
     "description": "Auth code input label"
   },
   "authentication_code_input_placeholder": {
-    "message": "Geben Sie Ihren einmaligen Authentifizierungscode ein",
+    "message": "Gib deinen einmaligen Authentifizierungscode ein",
     "description": "Placeholder text for the authentication code input field"
   },
   "auth_code_input_placeholder": {
-    "message": "Geben Sie Ihren einmaligen Authentifizierungscode ein",
+    "message": "Gib deinen einmaligen Authentifizierungscode ein",
     "description": "Placeholder text for the authentication code input field"
   },
   "back": {
@@ -192,7 +192,7 @@
     "description": "Something went wrong error message"
   },
   "stay_completely_private_and_anonymous": {
-    "message": "Bleiben Sie völlig privat und anonym",
+    "message": "Bleib völlig privat und anonym",
     "description": "Used as a headline in the Initial Auth carousel."
   },
   "sync_device_location_with_provider": {
@@ -212,15 +212,15 @@
     "description": "Label for the user authentication input field."
   },
   "user_auth_input_placeholder": {
-    "message": "Geben Sie Ihre E-Mail oder Telefonnummer ein",
+    "message": "Gib deine E-Mail oder Telefonnummer ein",
     "description": "Placeholder text for the user authentication input field."
   },
   "verify_explanation": {
-    "message": "Sagen Sie uns, wer Sie wirklich sind. Geben Sie den Code ein, den wir Ihnen zur Identitätsprüfung gesendet haben.",
+    "message": "Sag uns, wer du wirklich bist. Gib den Code ein, den wir dir zur Identitätsprüfung gesendet haben.",
     "description": "Sub header text explaining why verification is needed."
   },
   "verify_input_invalid": {
-    "message": "Es gab ein Problem bei der Authentifizierung Ihres Bestätigungscodes.",
+    "message": "Es gab ein Problem bei der Authentifizierung deines Bestätigungscodes.",
     "description": "Error message shown when the verification code input is invalid."
   },
   "verify_input_label": {

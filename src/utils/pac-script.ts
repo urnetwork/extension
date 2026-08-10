@@ -1,4 +1,4 @@
-import { pacBypassConditions } from "./bypass-rules";
+import { pacBypassConditions, deviceRpcApiHost } from "./bypass-rules";
 
 export interface PacSlot {
 	host: string;
@@ -25,8 +25,13 @@ export function buildPacScript(slots: PacSlot[], options: BuildPacOptions = {}):
 
 	const fallback = killSwitch ? "" : "; DIRECT";
 
+	// each slot's own device-rpc api host stays direct (see deviceRpcApiHost)
+	const apiHosts = slots
+		.map((s) => deviceRpcApiHost(s.host))
+		.filter((h): h is string => h !== null);
+
 	return `function FindProxyForURL(url, host) {
-  ${pacBypassConditions()}
+  ${pacBypassConditions(apiHosts)}
   return "${proxyList}${fallback}";
 }`;
 }

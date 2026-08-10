@@ -8,8 +8,9 @@
 // controlled by the app directly over the device-rpc websocket using the
 // signed proxy id this service hands back (see APP.md in mmm/ur.io).
 //
-// Verbs: PING, GET_STATUS, GET_USER, GET_SESSION, SETUP, CONNECT, DISCONNECT,
-// GET_KILL_SWITCH, SET_KILL_SWITCH, GET_GEO_SYNC, SET_PROVIDER_LOCATIONS.
+// Verbs: PING, GET_STATUS, GET_USER, GET_SESSION, SETUP, REFRESH_JWT, CONNECT,
+// DISCONNECT, GET_KILL_SWITCH, SET_KILL_SWITCH, GET_GEO_SYNC,
+// SET_PROVIDER_LOCATIONS, SET_LOCATION.
 // Events (broadcast to every connected ur.io tab): SESSION_CHANGED,
 // USER_CHANGED, GEO_SYNC_CHANGED. Device-state sync intentionally does NOT
 // flow through the bridge — the app subscribes to the device-rpc listeners
@@ -344,6 +345,63 @@ async function setupInternal(jwt: string, networkName?: string): Promise<{ user:
 	return { user };
 }
 
+// In-place jwt swap for the SAME network identity — the non-disruptive
+// counterpart to SETUP. After a payment/upgrade the app holds a fresh jwt with
+// a new entitlement claim; the extension only needs to start using it. Nothing
+// here requires a reconnect: the live proxy authenticates with the signed
+// proxy id (not the jwt), and every jwt consumer — connectInternal, the
+// renewal alarm, releaseClient, the popup's api calls — reads `by_jwt` from
+// storage at call time. So swapping storage makes api calls and the next
+// provision/renewal use the new jwt immediately while the proxy session keeps
+// running untouched.
+//
+// Statuses (returned as data, not thrown, so the page can branch):
+//   refreshed     — jwt swapped in place
+//   no_session    — extension has no stored identity; nothing to refresh
+//   wrong_network — jwt belongs to a different network than the stored one;
+//                   that is an account switch, which must go through SETUP's
+//                   atomic teardown, so the page falls back to it
+async function refreshJwtInternal(
+	jwt: string,
+): Promise<{ status: "refreshed" | "no_session" | "wrong_network"; user?: BridgeUser }> {
+	const claims = parseJwtClaims(jwt);
+	if (!claims) {
+		throw new Error("Invalid token");
+	}
+	if (claims.guest_mode) {
+		// same defensive stance as SETUP
+		throw new Error("Guest sessions cannot refresh the extension.");
+	}
+
+	const oldJwt = await getJwt();
+	if (!oldJwt) {
+		return { status: "no_session" };
+	}
+	const oldClaims = parseJwtClaims(oldJwt);
+	if (
+		typeof claims.network_id !== "string" ||
+		!claims.network_id ||
+		oldClaims?.network_id !== claims.network_id
+	) {
+		return { status: "wrong_network" };
+	}
+
+	const storageData: Record<string, string> = { by_jwt: jwt };
+	const name = typeof claims.network_name === "string" ? claims.network_name : undefined;
+	if (name) {
+		storageData.network_name = name;
+	}
+	await chrome.storage.local.set(storageData);
+
+	// keep the popup in sync (same signal SETUP and the external SET_JWT send);
+	// app tabs get USER_CHANGED from the storage.onChanged listener
+	chrome.runtime
+		.sendMessage({ type: "JWT_RECEIVED", jwt, networkName: name })
+		.catch(() => {});
+
+	return { status: "refreshed", user: await getUser() };
+}
+
 async function renewSession(): Promise<void> {
 	const record = await loadBridgeSession();
 	if (!record) return;
@@ -394,6 +452,15 @@ async function handleVerb(
 			const networkName =
 				typeof payload?.networkName === "string" ? payload.networkName : undefined;
 			return await serialize(() => setupInternal(jwt, networkName));
+		}
+		case "REFRESH_JWT": {
+			const jwt = payload?.byJwt;
+			if (typeof jwt !== "string" || !jwt) {
+				throw new Error("Missing byJwt");
+			}
+			// serialized so a refresh cannot interleave with a SETUP/DISCONNECT
+			// that is swapping the stored identity underneath it
+			return await serialize(() => refreshJwtInternal(jwt));
 		}
 		case "CONNECT": {
 			const locationId = typeof payload?.locationId === "string" ? payload.locationId : null;

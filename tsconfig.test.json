@@ -1,0 +1,12 @@
+{
+	// Type-checks the test suite (tests/ plus everything it imports from src/).
+	// Standalone on purpose: it is NOT referenced from tsconfig.json, so
+	// `tsc -b` in `npm run build` never sees test files and the production
+	// build is unaffected. Run via `npm run test:types` (test.sh does).
+	"extends": "./tsconfig.app.json",
+	"compilerOptions": {
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+		"types": ["vite/client", "chrome", "node"]
+	},
+	"include": ["tests"]
+}

@@ -10,9 +10,25 @@ if (!fs.existsSync(manifestPath)) {
 
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
-const serviceWorker = manifest.background?.service_worker || 'service-worker-loader.js';
+// Modern crxjs respects the firefox-style `background.scripts` input and emits
+// the built entry there (e.g. assets/index.ts-*.js) — preserve it. Older crxjs
+// emitted `background.service_worker` + a service-worker-loader.js shim, which
+// firefox needs translated to `scripts`. Either way the referenced file must
+// exist in the dist: a bad name here ships an extension whose background never
+// loads (every bridge/proxy feature silently dead).
+const existingScripts = Array.isArray(manifest.background?.scripts)
+  ? manifest.background.scripts.filter((s) => typeof s === 'string' && s)
+  : [];
+const scripts = existingScripts.length
+  ? existingScripts
+  : [manifest.background?.service_worker || 'service-worker-loader.js'];
+for (const script of scripts) {
+  if (!fs.existsSync(path.join(distDir, script))) {
+    throw new Error(`dist-firefox background script missing: ${script}`);
+  }
+}
 manifest.background = {
-  scripts: [serviceWorker],
+  scripts,
   type: 'module'
 };
 

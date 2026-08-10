@@ -1,5 +1,5 @@
 import type { PacSlot } from "./pac-script";
-import { shouldBypass, CHROME_BYPASS_LIST } from "./bypass-rules";
+import { shouldBypass, chromeBypassList, deviceRpcApiHost } from "./bypass-rules";
 import { getKillSwitch } from "./kill-switch";
 
 export interface ProxyConfig {
@@ -86,7 +86,9 @@ class ProxyManager {
 
 			try {
 				const { hostname } = new URL(details.url);
-				if (shouldBypass(hostname)) return [{ type: "direct" }];
+				// the connected proxy's own device-rpc api host must stay direct
+				const apiHost = deviceRpcApiHost(config.host);
+				if (shouldBypass(hostname, apiHost ? [apiHost] : [])) return [{ type: "direct" }];
 			} catch {
 				return [{ type: "direct" }];
 			}
@@ -159,7 +161,10 @@ class ProxyManager {
 
 			try {
 				const { hostname } = new URL(details.url);
-				if (shouldBypass(hostname)) return [{ type: "direct" }];
+				const apiHosts = this.firefoxMultiIpSlots
+					.map((s) => deviceRpcApiHost(s.host))
+					.filter((h): h is string => h !== null);
+				if (shouldBypass(hostname, apiHosts)) return [{ type: "direct" }];
 			} catch {
 				return [{ type: "direct" }];
 			}
@@ -299,7 +304,9 @@ class ProxyManager {
 					host: config.host,
 					port: config.port,
 				},
-				bypassList: CHROME_BYPASS_LIST,
+				bypassList: chromeBypassList(
+					[deviceRpcApiHost(config.host)].filter((h): h is string => h !== null),
+				),
 			},
 		};
 
