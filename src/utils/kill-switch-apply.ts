@@ -25,7 +25,7 @@ export async function applyKillSwitchSetting(enabled: boolean): Promise<void> {
 				const slots = JSON.parse(raw) as PacSlot[];
 				const health = await getStoredHealth();
 				const sorted = getSortedSlots(slots, health);
-				const pacScript = buildPacScript(sorted, { killSwitch: enabled });
+				const pacScript = await buildPacScript(sorted, { killSwitch: enabled });
 				const dataUrl = pacScriptToDataUrl(pacScript);
 				chrome.proxy.settings.set({
 					value: { mode: "pac_script", pacScript: { url: dataUrl } },
