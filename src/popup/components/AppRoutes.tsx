@@ -4,9 +4,13 @@ import AuthInitial from "./AuthInitial";
 import { ConnectScreen } from "./ConnectScreen";
 import { useAuth } from "@urnetwork/sdk-js/react";
 
-const AuthRoutes: React.FC = () => (
+interface AppRoutesProps {
+	onApiChange?: () => void;
+}
+
+const AuthRoutes: React.FC<{ onApiChange?: () => void }> = ({ onApiChange }) => (
 	<Routes>
-		<Route path="/" element={<AuthInitial />} />
+		<Route path="/" element={<AuthInitial onApiChange={onApiChange} />} />
 	</Routes>
 );
 
@@ -16,7 +20,7 @@ const MainRoutes: React.FC = () => (
 	</Routes>
 );
 
-export const AppRoutes: React.FC = () => {
+export const AppRoutes: React.FC<AppRoutesProps> = ({ onApiChange }) => {
 	const { isAuthenticated } = useAuth();
-	return isAuthenticated ? <MainRoutes /> : <AuthRoutes />;
+	return isAuthenticated ? <MainRoutes /> : <AuthRoutes onApiChange={onApiChange} />;
 };

@@ -4,9 +4,9 @@ import type {
 	ConnectLocation,
 	FindLocationsResult,
 } from "node_modules/@urnetwork/sdk-js/dist/generated";
+import { getStoredApiHost, buildApiBaseUrl } from "./api-config";
 
 const DEBOUNCE_MS = 400;
-const API_BASE = "https://api.bringyour.com";
 
 export interface RegionGroup {
 	region: ConnectLocation;
@@ -192,7 +192,8 @@ export function useProviderListEnhanced() {
 			if (searchQuery.length === 0) {
 				result = await (api as any).networkProviderLocations();
 			} else {
-				const response = await fetch(`${API_BASE}/network/find-provider-locations`, {
+				const apiBase = buildApiBaseUrl(await getStoredApiHost());
+				const response = await fetch(`${apiBase}/network/find-provider-locations`, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({

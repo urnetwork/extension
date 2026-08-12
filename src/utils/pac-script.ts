@@ -1,4 +1,5 @@
 import { pacBypassConditions, deviceRpcApiHost } from "./bypass-rules";
+import { getStoredApiHost } from "./api-config";
 
 export interface PacSlot {
 	host: string;
@@ -9,7 +10,7 @@ export interface BuildPacOptions {
 	killSwitch?: boolean;
 }
 
-export function buildPacScript(slots: PacSlot[], options: BuildPacOptions = {}): string {
+export async function buildPacScript(slots: PacSlot[], options: BuildPacOptions = {}): Promise<string> {
 	const { killSwitch = true } = options;
 
 	if (slots.length === 0) {
@@ -26,12 +27,16 @@ export function buildPacScript(slots: PacSlot[], options: BuildPacOptions = {}):
 	const fallback = killSwitch ? "" : "; DIRECT";
 
 	// each slot's own device-rpc api host stays direct (see deviceRpcApiHost)
-	const apiHosts = slots
+	const deviceHosts = slots
 		.map((s) => deviceRpcApiHost(s.host))
 		.filter((h): h is string => h !== null);
 
+	// a configured custom API host must also stay direct, or the extension
+	// can't reach it while the VPN is routing everything else
+	const customApiHost = await getStoredApiHost();
+
 	return `function FindProxyForURL(url, host) {
-  ${pacBypassConditions(apiHosts)}
+  ${pacBypassConditions([...deviceHosts, customApiHost])}
   return "${proxyList}${fallback}";
 }`;
 }

@@ -84,8 +84,8 @@ export default defineManifest({
 		},
 	],
 	host_permissions: isFirefox
-		? ["<all_urls>", "https://api.bringyour.com/*", "https://api-v4.bringyour.com/*"]
-		: ["https://api.bringyour.com/*", "https://api-v4.bringyour.com/*"],
+		? ["<all_urls>", "https://api.bringyour.com/*", "https://api-v4.bringyour.com/*", "https://*.ur.network/*"]
+		: ["https://api.bringyour.com/*", "https://api-v4.bringyour.com/*", "https://*.ur.network/*"],
 	web_accessible_resources: [
 		{
 			resources: ["wasm/sdk.wasm", "wasm/wasm_exec.js"],

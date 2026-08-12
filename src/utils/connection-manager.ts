@@ -196,7 +196,7 @@ export class ConnectionManager {
 			});
 		} else {
 			const killSwitch = await getKillSwitch();
-			const pacScript = buildPacScript(slotList, { killSwitch });
+			const pacScript = await buildPacScript(slotList, { killSwitch });
 			const dataUrl = pacScriptToDataUrl(pacScript);
 			response = await chrome.runtime.sendMessage({
 				type: "ENABLE_TAB_ISOLATION_PAC",

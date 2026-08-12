@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { UrButton, UrInput, UrText } from "@urnetwork/elements/react";
 import { getMessage } from "@/utils/i18n";
 import { useAuth, useAuthCodeLogin } from "@urnetwork/sdk-js/react";
+import { getStoredApiHost, setStoredApiHost, getDefaultApiHost } from "@/utils/api-config";
 
 interface JWTReceivedMessage {
 	type: "JWT_RECEIVED";
@@ -9,11 +10,27 @@ interface JWTReceivedMessage {
 	networkName?: string;
 }
 
-const AuthInitial: React.FC = () => {
+interface AuthInitialProps {
+	onApiChange?: () => void;
+}
+
+const AuthInitial: React.FC<AuthInitialProps> = ({ onApiChange }) => {
 	const [authCode, setAuthCode] = useState("");
 	const [ssoLoading, setSsoLoading] = useState(false);
 	const { setAuth } = useAuth();
 	const { authCodeLogin, loading, error } = useAuthCodeLogin();
+
+	const [showApiConfig, setShowApiConfig] = useState(false);
+	const [apiHost, setApiHost] = useState(getDefaultApiHost());
+	const [apiHostInput, setApiHostInput] = useState("");
+	const [apiSaving, setApiSaving] = useState(false);
+
+	useEffect(() => {
+		getStoredApiHost().then((host) => {
+			setApiHost(host);
+			setApiHostInput(host);
+		});
+	}, []);
 
 	useEffect(() => {
 		const messageListener = (message: JWTReceivedMessage) => {
@@ -48,6 +65,34 @@ const AuthInitial: React.FC = () => {
 			console.error("Failed to initiate SSO:", err);
 		} finally {
 			setSsoLoading(false);
+		}
+	};
+
+	const handleSaveApiHost = async () => {
+		const trimmed = apiHostInput.trim();
+		if (!trimmed) return;
+		setApiSaving(true);
+		try {
+			await setStoredApiHost(trimmed);
+			const resolved = trimmed === getDefaultApiHost() ? getDefaultApiHost() : trimmed;
+			setApiHost(resolved);
+			setShowApiConfig(false);
+			onApiChange?.();
+		} finally {
+			setApiSaving(false);
+		}
+	};
+
+	const handleResetApiHost = async () => {
+		setApiSaving(true);
+		try {
+			await setStoredApiHost(getDefaultApiHost());
+			setApiHost(getDefaultApiHost());
+			setApiHostInput(getDefaultApiHost());
+			setShowApiConfig(false);
+			onApiChange?.();
+		} finally {
+			setApiSaving(false);
 		}
 	};
 
@@ -156,6 +201,65 @@ const AuthInitial: React.FC = () => {
 						</UrText>
 					</div>
 				)}
+
+				{/* Change Network API section */}
+				<div className="mt-6 pt-4 border-t border-white/10">
+					{!showApiConfig ? (
+						<button
+							type="button"
+							onClick={() => {
+								setApiHostInput(apiHost);
+								setShowApiConfig(true);
+							}}
+							className="text-[11px] opacity-40 hover:opacity-70 transition-opacity cursor-pointer"
+						>
+							{apiHost !== getDefaultApiHost()
+								? `Network API: ${apiHost}`
+								: "Change Network API"}
+						</button>
+					) : (
+						<div className="text-left">
+							<label className="block text-[11px] font-medium opacity-50 mb-1.5">
+								Network API Host
+							</label>
+							<div className="mb-2 rounded-xl overflow-hidden" style={{ background: "var(--color-surface-2)" }}>
+								<UrInput
+									placeholder="api.ur.network"
+									value={apiHostInput}
+									onInput={(e) => setApiHostInput(e.detail.value)}
+								/>
+							</div>
+							<div className="flex gap-2">
+								<UrButton
+									onClick={handleSaveApiHost}
+									loading={apiSaving}
+									disabled={apiSaving || !apiHostInput.trim()}
+									fullWidth
+									variant="secondary"
+								>
+									Save
+								</UrButton>
+								{apiHost !== getDefaultApiHost() && (
+									<UrButton
+										onClick={handleResetApiHost}
+										loading={apiSaving}
+										disabled={apiSaving}
+										variant="secondary"
+									>
+										Reset
+									</UrButton>
+								)}
+								<button
+									type="button"
+									onClick={() => setShowApiConfig(false)}
+									className="text-xs opacity-50 hover:opacity-80 px-2"
+								>
+									Cancel
+								</button>
+							</div>
+						</div>
+					)}
+				</div>
 			</div>
 		</div>
 	);

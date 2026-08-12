@@ -1,6 +1,7 @@
 import type { PacSlot } from "./pac-script";
 import { shouldBypass, chromeBypassList, deviceRpcApiHost } from "./bypass-rules";
 import { getKillSwitch } from "./kill-switch";
+import { getStoredApiHost } from "./api-config";
 
 export interface ProxyConfig {
 	host: string;
@@ -54,9 +55,17 @@ class ProxyManager {
 	private firefoxListener: ((details: FirefoxProxyDetails) => FirefoxProxyInfo[]) | null = null;
 	private firefoxMultiIpSlots: PacSlot[] = [];
 	private killSwitchEnabled = true;
+	// The configured custom API host, if any (see utils/api-config). Cached
+	// in-memory and refreshed at connect time so the per-request Firefox
+	// listener closures can consult it synchronously.
+	private customApiHost: string | null = null;
 
 	async loadKillSwitch(): Promise<void> {
 		this.killSwitchEnabled = await getKillSwitch();
+	}
+
+	async refreshCustomApiHost(): Promise<void> {
+		this.customApiHost = await getStoredApiHost();
 	}
 
 	setKillSwitchState(enabled: boolean): void {
@@ -86,9 +95,11 @@ class ProxyManager {
 
 			try {
 				const { hostname } = new URL(details.url);
-				// the connected proxy's own device-rpc api host must stay direct
+				// the connected proxy's own device-rpc api host, and any configured
+				// custom API host, must stay direct
 				const apiHost = deviceRpcApiHost(config.host);
-				if (shouldBypass(hostname, apiHost ? [apiHost] : [])) return [{ type: "direct" }];
+				const extraHosts = [apiHost, this.customApiHost].filter((h): h is string => h !== null);
+				if (shouldBypass(hostname, extraHosts)) return [{ type: "direct" }];
 			} catch {
 				return [{ type: "direct" }];
 			}
@@ -164,7 +175,8 @@ class ProxyManager {
 				const apiHosts = this.firefoxMultiIpSlots
 					.map((s) => deviceRpcApiHost(s.host))
 					.filter((h): h is string => h !== null);
-				if (shouldBypass(hostname, apiHosts)) return [{ type: "direct" }];
+				const extraHosts = this.customApiHost ? [...apiHosts, this.customApiHost] : apiHosts;
+				if (shouldBypass(hostname, extraHosts)) return [{ type: "direct" }];
 			} catch {
 				return [{ type: "direct" }];
 			}
@@ -286,6 +298,8 @@ class ProxyManager {
 
 	/** Enable the VPN proxy with the given configuration. */
 	async enable(config: ProxyConfig): Promise<void> {
+		await this.refreshCustomApiHost();
+
 		if (isFirefoxProxyApiAvailable()) {
 			this.addFirefoxProxyListener(config);
 			this.state = { enabled: true, mode: "fixed", config };
@@ -305,7 +319,9 @@ class ProxyManager {
 					port: config.port,
 				},
 				bypassList: chromeBypassList(
-					[deviceRpcApiHost(config.host)].filter((h): h is string => h !== null),
+					[deviceRpcApiHost(config.host), this.customApiHost].filter(
+						(h): h is string => h !== null,
+					),
 				),
 			},
 		};
@@ -374,6 +390,7 @@ class ProxyManager {
 	/** Restore proxy state on extension startup. */
 	async restoreState(): Promise<void> {
 		await this.loadKillSwitch();
+		await this.refreshCustomApiHost();
 
 		if (isFirefoxProxyApiAvailable()) {
 			const result = await chrome.storage.local.get([

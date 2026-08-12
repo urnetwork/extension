@@ -6,6 +6,7 @@ import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
 import { isAllowedOrigin } from "../utils/origins";
 import { initBridge, notifySessionChanged, handleExtensionLocationChange } from "../bridge/background";
 import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
+import { getStoredApiHost, buildApiBaseUrl } from "../utils/api-config";
 
 const HEALTH_ALARM_NAME = "node-health-check";
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
@@ -74,7 +75,7 @@ async function performHealthCheck(): Promise<void> {
 		proxyManager.enableMultiIp(sorted);
 	} else {
 		const killSwitch = await getKillSwitch();
-		const pacScript = buildPacScript(sorted, { killSwitch });
+		const pacScript = await buildPacScript(sorted, { killSwitch });
 		const dataUrl = pacScriptToDataUrl(pacScript);
 
 		chrome.proxy.settings.set({
@@ -144,7 +145,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
 });
 
 async function completeSsoLogin(code: string): Promise<void> {
-	const response = await fetch("https://api.bringyour.com/auth/code-login", {
+	const apiHost = await getStoredApiHost();
+	const response = await fetch(`${buildApiBaseUrl(apiHost)}/auth/code-login`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ auth_code: code }),
