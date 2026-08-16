@@ -7,6 +7,9 @@ const API_BASE = "https://api.bringyour.com";
 
 export type BridgeProxyConfigResult = {
 	auth_token?: string;
+	// Exact hosted DeviceLocal identity. DeviceRemote pairing is strict: callers
+	// must never synthesize or substitute this value.
+	instance_id?: string;
 	proxy_host?: string;
 	https_proxy_port?: number;
 	// device-rpc endpoint base: https://api.<proxy_host>:<api_port>

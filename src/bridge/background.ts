@@ -70,6 +70,7 @@ export type BridgeUser = {
 export type BridgeSessionInfo = {
 	connected: boolean;
 	mode?: "standard" | "multi-ip";
+	instanceId?: string | null;
 	signedProxyId?: string;
 	proxyHost?: string;
 	httpsProxyPort?: number;
@@ -119,6 +120,7 @@ async function getSessionInfo(): Promise<BridgeSessionInfo> {
 			return {
 				connected: true,
 				mode: "standard",
+				instanceId: record.instanceId ?? null,
 				signedProxyId: record.signedProxyId,
 				proxyHost: record.proxyHost,
 				httpsProxyPort: record.httpsProxyPort,
@@ -138,6 +140,7 @@ async function getSessionInfo(): Promise<BridgeSessionInfo> {
 			return {
 				connected: true,
 				mode: "standard",
+				instanceId: null,
 				signedProxyId: host.slice(0, dot),
 				proxyHost: host.slice(dot + 1),
 				httpsProxyPort: state.config.port,
@@ -145,7 +148,7 @@ async function getSessionInfo(): Promise<BridgeSessionInfo> {
 				clientId: await chromeStorageAdapter.getItem(STORAGE_KEY_CLIENT_ID),
 			};
 		}
-		return { connected: true, mode: "standard", apiBaseUrl: null };
+		return { connected: true, mode: "standard", instanceId: null, apiBaseUrl: null };
 	}
 
 	if (state.enabled && state.mode === "pac") {
@@ -206,7 +209,13 @@ async function connectInternal(
 	}
 
 	const pr = result.proxy_config_result;
-	if (!result.by_client_jwt || !pr?.auth_token || !pr.proxy_host || !pr.https_proxy_port) {
+	if (
+		!result.by_client_jwt ||
+		!pr?.auth_token ||
+		!pr.instance_id ||
+		!pr.proxy_host ||
+		!pr.https_proxy_port
+	) {
 		return {
 			ok: false,
 			error: "Incomplete proxy configuration received",
@@ -235,6 +244,7 @@ async function connectInternal(
 
 	const record: BridgeSessionRecord = {
 		clientId: newClientId,
+		instanceId: pr.instance_id,
 		signedProxyId: pr.auth_token,
 		proxyHost: pr.proxy_host,
 		httpsProxyPort: pr.https_proxy_port,

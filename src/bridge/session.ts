@@ -6,6 +6,7 @@
 // provision (popup or bridge initiated), cleared on teardown.
 export type BridgeSessionRecord = {
 	clientId: string | null;
+	instanceId: string;
 	signedProxyId: string;
 	proxyHost: string;
 	httpsProxyPort?: number;
