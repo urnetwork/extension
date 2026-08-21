@@ -45,7 +45,7 @@ export default defineManifest({
 		{
 			matches: [
 				"https://ur.io/*",
-				"https://app.ur.network/*",
+				"https://manager.bringyour.com/*",
 				// local development of the ur.io app
 				"http://localhost/*",
 			],
@@ -93,7 +93,7 @@ export default defineManifest({
 		},
 	],
 	externally_connectable: {
-		matches: ["https://ur.io/*", "https://app.ur.network/*"],
+		matches: ["https://ur.io/*", "https://manager.bringyour.com/*"],
 	},
 	...(isFirefox
 		? {

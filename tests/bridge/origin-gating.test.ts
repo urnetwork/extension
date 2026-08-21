@@ -1,8 +1,8 @@
 // Origin gating at port-connect time. The bridge accepts a port only when the
-// sender url passes isAllowedOrigin (ur.io / ur.network / localhost, exact or
-// subdomain); everything else is disconnected before any message listener is
-// registered — so no verb, including REFRESH_JWT, is reachable from a
-// disallowed origin.
+// sender url passes isAllowedOrigin (ur.io / manager.bringyour.com / localhost,
+// exact or subdomain); everything else is disconnected before any message
+// listener is registered — so no verb, including REFRESH_JWT, is reachable
+// from a disallowed origin.
 import { beforeEach, describe, expect, it } from "vitest";
 import {
 	createBridgeHarness,
@@ -21,7 +21,7 @@ describe("bridge origin gating", () => {
 	it.each([
 		"https://ur.io/app",
 		"https://app.ur.io/somewhere",
-		"https://ur.network/",
+		"https://manager.bringyour.com/",
 		"http://localhost:5173/app",
 	])("accepts %s and serves requests", async (url) => {
 		const app = h.connect(url);
@@ -34,6 +34,7 @@ describe("bridge origin gating", () => {
 
 	it.each([
 		"https://evil.example/",
+		"https://ur.network/",
 		// suffix spoofs of the allowlist
 		"https://ur.io.evil.example/",
 		"https://notur.io/",

@@ -1,6 +1,6 @@
 declare const browser: typeof chrome | undefined;
 
-const SSO_BASE_URL = "https://beta.app.ur.network/login-extension";
+const SSO_BASE_URL = "https://manager.bringyour.com/login-extension";
 const SSO_STATE_KEY = "sso_state";
 const SSO_STATE_TIMESTAMP_KEY = "sso_state_ts";
 const STATE_MAX_AGE_MS = 5 * 60 * 1000;

@@ -174,7 +174,7 @@ function isSsoCompleteUrlLegacy(url: string): boolean {
 		const parsed = new URL(url);
 		return (
 			parsed.protocol === "https:" &&
-			parsed.hostname === "beta.app.ur.network" &&
+			parsed.hostname === "manager.bringyour.com" &&
 			parsed.pathname === "/login-extension/complete"
 		);
 	} catch {

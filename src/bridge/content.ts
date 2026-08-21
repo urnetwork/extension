@@ -1,6 +1,6 @@
 // App content-channel bridge (page side).
 //
-// Injected on ur.io / app.ur.network. Relays window.postMessage requests from
+// Injected on ur.io / manager.bringyour.com. Relays window.postMessage requests from
 // the page to the background bridge service over a long-lived Port, relays
 // responses and events back, and announces itself so the page can detect that
 // the channel is mounted. This is the only page↔extension channel that works
