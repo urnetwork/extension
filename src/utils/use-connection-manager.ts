@@ -22,10 +22,24 @@ export function useConnectionManager(): UseConnectionManagerResult {
 	const proxyChangeCbRef = useRef<((config: null) => void) | null>(null);
 	const managerRef = useRef<ConnectionManager | null>(null);
 
+	// The ConnectionManager is created once and outlives the renders that produce
+	// these two SDK callbacks, so it reads them through refs instead of capturing
+	// them directly (recreating the manager would drop the live connection pool,
+	// ping interval and renew timer).
+	//
+	// Refresh the refs from a commit, never from render. A render can be thrown
+	// away, and a render-phase write would let a render that never committed
+	// publish its callback into the manager -- which invokes them from timers
+	// (silentRenew, scheduleReconnect) long after any render has finished. An
+	// effect with no dependency array runs after every commit, which is exactly
+	// the "latest committed value" semantics wanted here; the useRef seeds mean
+	// there is never an empty ref before the first commit.
 	const authFnRef = useRef(authNetworkClient);
 	const removeFnRef = useRef(removeNetworkClient);
-	authFnRef.current = authNetworkClient;
-	removeFnRef.current = removeNetworkClient;
+	useEffect(() => {
+		authFnRef.current = authNetworkClient;
+		removeFnRef.current = removeNetworkClient;
+	});
 
 	const getManager = useCallback((): ConnectionManager => {
 		if (!managerRef.current) {
