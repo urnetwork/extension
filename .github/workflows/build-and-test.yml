@@ -1,4 +1,9 @@
-name: Build and test - extension
+# Build and test the extension on every push and pull request.
+#
+# THIS WORKFLOW DOES NOT RELEASE ANYTHING. No signing, no store upload, no
+# npm publish, no secrets of any kind. The two zips it produces are a CI
+# artifact for inspection only.
+name: Build and test — extension
 
 on:
   push:
@@ -12,10 +17,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: lint, test, build (chrome + firefox)
     runs-on: ubuntu-latest
+    # the whole job runs in about a minute; this only catches a hang.
+    timeout-minutes: 15
     steps:
       - name: Check out extension
         uses: actions/checkout@v4
@@ -23,9 +34,9 @@ jobs:
       # package.json declares no `engines` and no `packageManager`, so nothing
       # in the repo pins a toolchain. The release pipeline (build/all/run.sh)
       # gates on node 24.14.1 + npm 11.11.0, but that gate is for the whole
-      # release build, not this repo: the only hard floor here is vite 7's
-      # `^20.19.0 || >=22.12.0`, and package-lock.json is lockfileVersion 3,
-      # which any npm >= 7 installs identically. Pinning the node 24 major
+      # release build, not this repo: the binding floors here are vite 7's
+      # `^20.19.0 || >=22.12.0` and vitest 4's `^20 || ^22 || >=24`, which
+      # together mean node ^20.19 || ^22.12 || >=24. Pinning the node 24 major
       # keeps CI on the same line the pipeline ships from without pretending
       # the patch release matters.
       - name: Set up Node
@@ -41,11 +52,17 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       # `eslint .` reports 12 errors on a fresh checkout of main, before any
-      # change of ours: 10 x @typescript-eslint/no-explicit-any, one unused
-      # `_tab`, and two react-hooks "Cannot access refs during render" in
-      # elements/src. They are pre-existing style debt, not a broken build, so
-      # lint is reported but not allowed to gate the thing this workflow is
-      # for. Drop continue-on-error once main lints clean.
+      # change of ours: 9 x @typescript-eslint/no-explicit-any (in
+      # src/background/index.ts, src/utils/{connection-manager,kill-switch-apply,
+      # proxy-manager,sso,use-provider-list-enhanced}.ts), one unused `_tab` at
+      # src/background/index.ts:126, and two react-hooks "Cannot access refs
+      # during render" at src/utils/use-connection-manager.ts:27-28. They are
+      # pre-existing style debt, not a broken build, so lint is reported but not
+      # allowed to gate the thing this workflow is for -- the same mechanism
+      # connect/test.yml uses for its non-blocking extender step. Note the
+      # difference from that precedent: connect's step covers a genuinely flaky
+      # test, this one covers deterministic debt, so it will be red every single
+      # run until someone fixes it. Drop continue-on-error once main lints clean.
       - name: Lint (pre-existing failures, non-blocking)
         continue-on-error: true
         run: npm run lint
