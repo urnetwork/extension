@@ -48,7 +48,7 @@ function launchWebAuthFlow(options: WebAuthFlowOptions): Promise<string | undefi
 		identity.launchWebAuthFlow(options, (responseUrl) => {
 			const err =
 				chrome.runtime?.lastError?.message ||
-				(typeof browser !== "undefined" && (browser as any).runtime?.lastError?.message);
+				(typeof browser !== "undefined" && browser.runtime?.lastError?.message);
 			if (err) {
 				reject(new Error(err));
 				return;

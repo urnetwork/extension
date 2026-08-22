@@ -6,6 +6,7 @@ import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
 import { isAllowedOrigin } from "../utils/origins";
 import { initBridge, notifySessionChanged, handleExtensionLocationChange } from "../bridge/background";
 import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
+import type { FirefoxGlobal } from "../types/firefox-webext";
 
 const HEALTH_ALARM_NAME = "node-health-check";
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
@@ -14,11 +15,11 @@ const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 initBridge();
 
 function isFirefox(): boolean {
-	return Boolean((globalThis as any).browser?.proxy?.onRequest);
+	return Boolean((globalThis as FirefoxGlobal).browser?.proxy?.onRequest);
 }
 
 // Register Firefox proxy error listener
-const firefoxProxy = (globalThis as any).browser?.proxy;
+const firefoxProxy = (globalThis as FirefoxGlobal).browser?.proxy;
 if (firefoxProxy?.onError) {
 	firefoxProxy.onError.addListener((error: { message: string }) => {
 		console.error("Firefox proxy error:", error.message);
@@ -107,7 +108,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // Firefox: restore proxy listener immediately — no need to wait for Chrome's
 // proxy.settings.get() to settle. The 2-second delay only benefits Chrome.
-if ((globalThis as any).browser?.proxy?.onRequest) {
+if ((globalThis as FirefoxGlobal).browser?.proxy?.onRequest) {
 	proxyManager.restoreState().catch((err) => {
 		console.error("Failed to restore Firefox proxy state on startup:", err);
 	});
@@ -123,7 +124,7 @@ if ((globalThis as any).browser?.proxy?.onRequest) {
 // The main flow now uses chrome.identity.launchWebAuthFlow, which delivers the
 // auth code directly to the extension via a browser-controlled redirect URL.
 // This listener is kept only as a safety net for any legacy/manual tab flow.
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 	const url = changeInfo.url;
 	if (!url || !isSsoCompleteUrlLegacy(url)) return;
 

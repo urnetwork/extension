@@ -1,6 +1,13 @@
 import type { PacSlot } from "./pac-script";
 import { shouldBypass, chromeBypassList, deviceRpcApiHost } from "./bypass-rules";
 import { getKillSwitch } from "./kill-switch";
+import type {
+	FirefoxGlobal,
+	FirefoxProxyApi,
+	FirefoxProxyDetails,
+	FirefoxProxyInfo,
+	FirefoxProxyRequestListener,
+} from "../types/firefox-webext";
 
 export interface ProxyConfig {
 	host: string;
@@ -23,21 +30,8 @@ const STORAGE_KEYS = {
 	CONFIG: "proxy_config",
 } as const;
 
-type FirefoxProxyInfo = {
-	type: "http" | "https" | "socks" | "socks4" | "direct";
-	host?: string;
-	port?: number;
-	username?: string;
-	password?: string;
-	failoverTimeout?: number;
-};
-
-type FirefoxProxyDetails = {
-	url: string;
-};
-
-function getFirefoxProxyApi(): any | null {
-	return (globalThis as any).browser?.proxy ?? null;
+function getFirefoxProxyApi(): FirefoxProxyApi | null {
+	return (globalThis as FirefoxGlobal).browser?.proxy ?? null;
 }
 
 function isFirefoxProxyApiAvailable(): boolean {
@@ -51,7 +45,7 @@ function firefoxProxyType(scheme: ProxyConfig["scheme"]): FirefoxProxyInfo["type
 class ProxyManager {
 	private state: ProxyState = { enabled: false, mode: "direct", config: null };
 	private firefoxConfig: ProxyConfig | null = null;
-	private firefoxListener: ((details: FirefoxProxyDetails) => FirefoxProxyInfo[]) | null = null;
+	private firefoxListener: FirefoxProxyRequestListener | null = null;
 	private firefoxMultiIpSlots: PacSlot[] = [];
 	private killSwitchEnabled = true;
 
@@ -77,8 +71,9 @@ class ProxyManager {
 		}
 	}
 
-	private ensureFirefoxListener(): void {
-		if (this.firefoxListener) return;
+	/** Returns the single-proxy listener, creating it on first use. */
+	private ensureFirefoxListener(): FirefoxProxyRequestListener {
+		if (this.firefoxListener) return this.firefoxListener;
 
 		this.firefoxListener = (details: FirefoxProxyDetails): FirefoxProxyInfo[] => {
 			const config = this.firefoxConfig;
@@ -108,24 +103,26 @@ class ProxyManager {
 			}
 			return [proxyInfo, { type: "direct" }];
 		};
+
+		return this.firefoxListener;
 	}
 
 	private addFirefoxProxyListener(config: ProxyConfig): void {
 		const firefoxProxyApi = getFirefoxProxyApi();
 		if (!firefoxProxyApi?.onRequest) return;
 
-		this.ensureFirefoxListener();
+		const listener = this.ensureFirefoxListener();
 		this.firefoxConfig = config;
 
 		try {
-			if (firefoxProxyApi.onRequest.hasListener(this.firefoxListener)) {
-				firefoxProxyApi.onRequest.removeListener(this.firefoxListener);
+			if (firefoxProxyApi.onRequest.hasListener(listener)) {
+				firefoxProxyApi.onRequest.removeListener(listener);
 			}
 		} catch {
 			// Ignore stale listener cleanup failures.
 		}
 
-		firefoxProxyApi.onRequest.addListener(this.firefoxListener, {
+		firefoxProxyApi.onRequest.addListener(listener, {
 			urls: ["<all_urls>"],
 		});
 	}
@@ -151,7 +148,11 @@ class ProxyManager {
 	enableMultiIp(slots: PacSlot[]): void {
 		if (!isFirefoxProxyApiAvailable() || slots.length === 0) return;
 
-		const firefoxProxyApi = getFirefoxProxyApi();
+		const onRequest = getFirefoxProxyApi()?.onRequest;
+		// isFirefoxProxyApiAvailable() above already established this; the explicit
+		// check is what narrows the optional event for the type checker.
+		if (!onRequest) return;
+
 		this.removeFirefoxProxyListener();
 
 		this.firefoxMultiIpSlots = slots;
@@ -182,7 +183,7 @@ class ProxyManager {
 			return proxies;
 		};
 
-		firefoxProxyApi.onRequest.addListener(this.firefoxListener, {
+		onRequest.addListener(this.firefoxListener, {
 			urls: ["<all_urls>"],
 		});
 

@@ -2,11 +2,12 @@ import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "./pac-script";
 import { getSortedSlots, getStoredHealth } from "./node-health";
 import { setKillSwitch } from "./kill-switch";
 import { proxyManager } from "./proxy-manager";
+import type { FirefoxGlobal } from "../types/firefox-webext";
 
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
 function isFirefox(): boolean {
-	return Boolean((globalThis as any).browser?.proxy?.onRequest);
+	return Boolean((globalThis as FirefoxGlobal).browser?.proxy?.onRequest);
 }
 
 // Persist + apply the kill-switch setting. Shared by the popup message handler

@@ -5,6 +5,7 @@ import { chromeStorageAdapter } from "./storage-adapter";
 import { getKillSwitch } from "./kill-switch";
 import { buildAuthParams } from "./auth-params";
 import { clearBridgeSession } from "../bridge/session";
+import type { FirefoxGlobal } from "../types/firefox-webext";
 
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
@@ -58,7 +59,7 @@ const MULTI_IP_PING_INTERVAL_S = 300;
 let lastPingAt = 0;
 
 function isFirefox(): boolean {
-	return Boolean((globalThis as any).browser?.proxy?.onRequest);
+	return Boolean((globalThis as FirefoxGlobal).browser?.proxy?.onRequest);
 }
 
 export class ConnectionManager {
