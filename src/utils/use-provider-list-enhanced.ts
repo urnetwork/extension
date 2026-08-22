@@ -190,7 +190,7 @@ export function useProviderListEnhanced() {
 			let result: FindLocationsResult;
 
 			if (searchQuery.length === 0) {
-				result = await (api as any).networkProviderLocations();
+				result = await api.networkProviderLocations();
 			} else {
 				const response = await fetch(`${API_BASE}/network/find-provider-locations`, {
 					method: "POST",
