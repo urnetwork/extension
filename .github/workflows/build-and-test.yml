@@ -1,0 +1,103 @@
+name: Build and test - extension
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: lint, test, build (chrome + firefox)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out extension
+        uses: actions/checkout@v4
+
+      # package.json declares no `engines` and no `packageManager`, so nothing
+      # in the repo pins a toolchain. The release pipeline (build/all/run.sh)
+      # gates on node 24.14.1 + npm 11.11.0, but that gate is for the whole
+      # release build, not this repo: the only hard floor here is vite 7's
+      # `^20.19.0 || >=22.12.0`, and package-lock.json is lockfileVersion 3,
+      # which any npm >= 7 installs identically. Pinning the node 24 major
+      # keeps CI on the same line the pipeline ships from without pretending
+      # the patch release matters.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # ci, not install: the lockfile is the contract, and every dependency
+      # (@urnetwork/sdk-js and @urnetwork/localizations included) resolves from
+      # the public registry, so no token is needed.
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      # tsconfig.test.json is not referenced from tsconfig.json, so the `tsc -b`
+      # inside `npm run build` never type-checks tests/. Checking it explicitly
+      # is what test.sh does.
+      - name: Type-check tests
+        run: npm run test:types
+
+      # the suite is offline by construction -- tests/setup.ts stubs fetch to
+      # reject -- so it needs no network, no secrets and no browser.
+      - name: Test
+        run: npm test
+
+      # same two commands the Makefile runs, minus the local-sibling
+      # localizations overlay build.sh does: scripts/build-locales.js falls back
+      # to the published @urnetwork/localizations package on a standalone
+      # checkout, which is exactly the CI case.
+      - name: Build (chrome)
+        run: npm run build
+
+      - name: Build (firefox)
+        run: npm run build:firefox
+
+      # vite-plugin-zip-pack is the last thing to run in each build, so a
+      # missing or trivially small zip means a build that reported success
+      # without producing a loadable extension.
+      - name: Verify both extension zips
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          for zip in \
+            "release/crx-@urnetwork-extension-${version}.zip" \
+            "release/crx-@urnetwork-extension-${version}-firefox.zip"
+          do
+            if [ ! -f "$zip" ]; then
+              echo "missing: $zip"
+              ls -la release || true
+              exit 1
+            fi
+            size=$(stat -c%s "$zip")
+            echo "$zip: $size bytes"
+            if [ "$size" -lt 100000 ]; then
+              echo "$zip is too small to be a real build"
+              exit 1
+            fi
+          done
+          # the firefox patch step rewrites background.* in place; if it did not
+          # run, the manifest still has chrome's service_worker
+          node -e '
+            const m = require("./dist-firefox/manifest.json");
+            if (!Array.isArray(m.background?.scripts)) {
+              throw new Error("dist-firefox manifest was not patched for firefox");
+            }
+          '
+
+      - name: Upload the extension zips
+        uses: actions/upload-artifact@v4
+        with:
+          name: urnetwork-extension-zips
+          path: release/*.zip
