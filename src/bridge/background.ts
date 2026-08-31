@@ -116,7 +116,13 @@ async function getSessionInfo(): Promise<BridgeSessionInfo> {
 	const record = await loadBridgeSession();
 
 	if (state.enabled && state.mode === "fixed" && state.config) {
-		if (record && state.config.host === `${record.signedProxyId}.${record.proxyHost}`) {
+		// Chrome canonicalizes DNS hostnames to lowercase, while the server's
+		// signed proxy id is uppercase base32. Hostname identity is case-insensitive.
+		const configuredHost = state.config.host.toLowerCase();
+		const recordedHost = record
+			? `${record.signedProxyId}.${record.proxyHost}`.toLowerCase()
+			: null;
+		if (record && configuredHost === recordedHost) {
 			return {
 				connected: true,
 				mode: "standard",

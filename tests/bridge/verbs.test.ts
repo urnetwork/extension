@@ -42,6 +42,42 @@ describe("bridge verb dispatch", () => {
 		});
 	});
 
+	it("GET_STATUS preserves the device session when Chrome lowercases the proxy hostname", async () => {
+		const { record } = await h.seedLiveSession();
+		const signedProxyId = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
+		const configuredHost = `${signedProxyId}.${record.proxyHost}`;
+		h.chrome.seedStorage({
+			bridge_session: { ...record, signedProxyId },
+			proxy_config: {
+				host: configuredHost,
+				port: record.httpsProxyPort,
+				scheme: "https",
+			},
+		});
+		h.chrome.setProxyValue({
+			mode: "fixed_servers",
+			rules: {
+				singleProxy: {
+					scheme: "https",
+					host: configuredHost.toLowerCase(),
+					port: record.httpsProxyPort,
+				},
+			},
+		});
+
+		const res = await app.request("GET_STATUS");
+
+		expect(res.ok).toBe(true);
+		expect(res.data).toMatchObject({
+			session: {
+				connected: true,
+				instanceId: record.instanceId,
+				signedProxyId,
+				apiBaseUrl: record.apiBaseUrl,
+			},
+		});
+	});
+
 	it("a disconnected page port stops counting as an attached app", async () => {
 		expect(h.bridge.hasConnectedApp()).toBe(true);
 		app.disconnectFromClient();
