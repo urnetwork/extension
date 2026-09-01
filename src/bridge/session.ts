@@ -1,15 +1,13 @@
 // The bridge session record is the extension's durable snapshot of the active
-// standard-mode proxy session. It is what the ur.io app needs to attach a
-// DeviceRemote to the hosted device: the signed proxy id (= auth_token, the
-// device-rpc credential) and the proxy api base url (the device-rpc endpoint,
-// wss://api.<proxyHost>:<apiPort>/device-rpc). Written on every successful
-// provision (popup or bridge initiated), cleared on teardown.
+// standard-mode proxy session. Device-rpc endpoint and credential fields are
+// extension-private and must never be returned to the ur.io page. Written on
+// every successful standard-mode bridge provision and cleared on teardown.
 export type BridgeSessionRecord = {
 	clientId: string | null;
 	instanceId: string;
 	signedProxyId: string;
 	proxyHost: string;
-	httpsProxyPort?: number;
+	httpsProxyPort: number;
 	// https://api.<proxyHost>:<apiPort> — the device-rpc endpoint base
 	apiBaseUrl: string | null;
 	expirationTime?: string;

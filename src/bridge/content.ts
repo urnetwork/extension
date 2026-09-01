@@ -9,8 +9,10 @@
 // name are defined in protocol.ts.
 import {
 	BRIDGE_PORT_NAME,
+	DEVICE_RPC_PORT_NAME,
 	EXTENSION_SENDER,
 	PAGE_FRAME_MARKER,
+	type DeviceRpcPageFrame,
 	type PageRequestFrame,
 } from "./protocol";
 
@@ -20,6 +22,8 @@ const RECONNECT_MAX_MS = 10_000;
 let port: chrome.runtime.Port | null = null;
 let reconnectDelay = RECONNECT_MIN_MS;
 let closed = false;
+let devicePort: chrome.runtime.Port | null = null;
+const deviceConnections = new Set<string>();
 
 // request ids in flight, so a dropped port can fail them fast
 const pending = new Set<string | number>();
@@ -97,11 +101,79 @@ function connectPort(): chrome.runtime.Port | null {
 	return port;
 }
 
+function sanitizeDeviceFrame(data: DeviceRpcPageFrame): Record<string, unknown> | null {
+	if (data.urnb !== PAGE_FRAME_MARKER || data.dir !== "device-rpc" || data.from === EXTENSION_SENDER) return null;
+	if (typeof data.connectionId !== "string" || !data.connectionId || 128 < data.connectionId.length) return null;
+	switch (data.kind) {
+		case "OPEN":
+			if (typeof data.instanceId !== "string" || !data.instanceId) return null;
+			return { dir: "device-rpc", kind: "OPEN", connectionId: data.connectionId, instanceId: data.instanceId };
+		case "FRAME":
+			if (!Number.isSafeInteger(data.sequence) || (data.sequence as number) <= 0 || typeof data.data !== "string" || !Number.isSafeInteger(data.byteLength)) return null;
+			return { dir: "device-rpc", kind: "FRAME", connectionId: data.connectionId, sequence: data.sequence, data: data.data, byteLength: data.byteLength };
+		case "FRAME_RECEIVED":
+			if (!Number.isSafeInteger(data.sequence) || (data.sequence as number) <= 0) return null;
+			return { dir: "device-rpc", kind: "FRAME_RECEIVED", connectionId: data.connectionId, sequence: data.sequence };
+		case "CLOSE":
+			return { dir: "device-rpc", kind: "CLOSE", connectionId: data.connectionId };
+		default:
+			return null;
+	}
+}
+
+function connectDevicePort(): chrome.runtime.Port | null {
+	if (devicePort) return devicePort;
+	try {
+		devicePort = chrome.runtime.connect({ name: DEVICE_RPC_PORT_NAME });
+	} catch {
+		return null;
+	}
+	const connectedPort = devicePort;
+	connectedPort.onMessage.addListener((msg: Record<string, unknown>) => {
+		if (!msg || msg.dir !== "device-rpc" || typeof msg.connectionId !== "string") return;
+		if (!deviceConnections.has(msg.connectionId)) return;
+		if (msg.kind === "CLOSED") deviceConnections.delete(msg.connectionId);
+		post(msg);
+	});
+	connectedPort.onDisconnect.addListener(() => {
+		if (devicePort === connectedPort) devicePort = null;
+		for (const connectionId of deviceConnections) {
+			post({
+				dir: "device-rpc",
+				kind: "CLOSED",
+				connectionId,
+				reason: "extension device rpc channel disconnected",
+			});
+		}
+		deviceConnections.clear();
+	});
+	return connectedPort;
+}
+
 window.addEventListener("message", (event: MessageEvent) => {
 	// only same-window, same-origin page messages
 	if (event.source !== window) return;
 	if (event.origin !== window.location.origin) return;
-	const data = event.data as PageRequestFrame | null;
+	const data = event.data as (PageRequestFrame & DeviceRpcPageFrame) | null;
+	if (data?.dir === "device-rpc") {
+		const frame = sanitizeDeviceFrame(data);
+		if (!frame) return;
+		const connectionId = frame.connectionId as string;
+		if (frame.kind === "OPEN") deviceConnections.add(connectionId);
+		const p = connectDevicePort();
+		if (!p) {
+			deviceConnections.delete(connectionId);
+			post({ dir: "device-rpc", kind: "CLOSED", connectionId, reason: "extension device rpc unavailable" });
+			return;
+		}
+		try {
+			p.postMessage(frame);
+		} catch {
+			deviceConnections.delete(connectionId);
+			post({ dir: "device-rpc", kind: "CLOSED", connectionId, reason: "extension device rpc disconnected" });
+		}
+		return;
+	}
 	if (!data || data.urnb !== PAGE_FRAME_MARKER || data.dir !== "req") return;
 	if (data.from === EXTENSION_SENDER) return; // ignore our own posts
 	const { id, verb, payload } = data;

@@ -12,6 +12,10 @@ export default defineManifest({
 	manifest_version: 3,
 	name: "URnetwork",
 	version: pkg.version,
+	// Device RPC lives in the extension service worker. Chrome 116 is the
+	// first release where active WebSocket traffic reliably extends that
+	// worker's lifetime; the bridge sends a keepalive every 20 seconds.
+	...(isFirefox ? {} : { minimum_chrome_version: "116" }),
 	default_locale: "en",
 	icons: {
 		16: "logo.png",

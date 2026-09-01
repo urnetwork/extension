@@ -18,8 +18,17 @@
 // The relay forwards service frames to the page unchanged apart from adding
 // the page markers. The verbs and events themselves are documented in
 // background.ts.
+//
+// Opaque SDK traffic uses DEVICE_RPC_PORT_NAME and dir:"device-rpc" frames.
+// OPEN carries only {connectionId, instanceId}; endpoints and credentials are
+// resolved inside the background service and never exist on the page channel.
 
 export const BRIDGE_PORT_NAME = "urnetwork-app-bridge";
+
+// Dedicated high-volume channel for opaque SDK device-rpc frames. Keeping it
+// separate from BRIDGE_PORT_NAME prevents control responses/events from being
+// queued behind binary traffic and lets either channel reconnect independently.
+export const DEVICE_RPC_PORT_NAME = "urnetwork-device-rpc-v1";
 
 // Marker field value on every page-hop frame ({ urnb: PAGE_FRAME_MARKER }).
 export const PAGE_FRAME_MARKER = 1;
@@ -44,4 +53,20 @@ export type PortRequestFrame = {
 	id?: unknown;
 	verb?: unknown;
 	payload?: unknown;
+};
+
+export const DEVICE_RPC_FRAME_MAX_BYTES = 3 * 1024 * 1024;
+export const DEVICE_RPC_QUEUE_MAX_BYTES = 4 * 1024 * 1024;
+export const DEVICE_RPC_QUEUE_MAX_FRAMES = 64;
+
+export type DeviceRpcPageFrame = {
+	urnb?: unknown;
+	dir?: unknown;
+	from?: unknown;
+	kind?: unknown;
+	connectionId?: unknown;
+	instanceId?: unknown;
+	sequence?: unknown;
+	data?: unknown;
+	byteLength?: unknown;
 };

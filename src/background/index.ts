@@ -5,6 +5,7 @@ import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
 import { isAllowedOrigin } from "../utils/origins";
 import { initBridge, notifySessionChanged, handleExtensionLocationChange } from "../bridge/background";
+import { initDeviceRpcBridge } from "../bridge/device-rpc";
 import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
 import type { FirefoxGlobal } from "../types/firefox-webext";
 
@@ -13,6 +14,7 @@ const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
 // app content-channel bridge (ur.io app ↔ extension)
 initBridge();
+initDeviceRpcBridge();
 
 function isFirefox(): boolean {
 	return Boolean((globalThis as FirefoxGlobal).browser?.proxy?.onRequest);

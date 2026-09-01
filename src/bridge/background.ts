@@ -2,25 +2,24 @@
 //
 // The ur.io app talks to the extension through a content script (content.ts)
 // that relays window.postMessage requests over a long-lived Port to this
-// service. The extension's role in the app architecture is deliberately small:
-// mint the proxy session (auth_network_client → signed proxy id) and
-// install/remove the browser proxy. Everything else about the connection is
-// controlled by the app directly over the device-rpc websocket using the
-// signed proxy id this service hands back (see APP.md in mmm/ur.io).
+// service. The extension owns both proxy-session credentials and the actual
+// device-rpc websocket. This bridge exposes lifecycle/status verbs; opaque SDK
+// rpc frames use the dedicated service in device-rpc.ts. Secrets never cross
+// either bridge into the page.
 //
 // Verbs: PING, GET_STATUS, GET_USER, GET_SESSION, SETUP, REFRESH_JWT, CONNECT,
 // DISCONNECT, GET_KILL_SWITCH, SET_KILL_SWITCH, GET_GEO_SYNC,
 // SET_PROVIDER_LOCATIONS, SET_LOCATION.
 // Events (broadcast to every connected ur.io tab): SESSION_CHANGED,
-// USER_CHANGED, GEO_SYNC_CHANGED. Device-state sync intentionally does NOT
-// flow through the bridge — the app subscribes to the device-rpc listeners
-// natively. Wire frame shapes and the port name are defined in protocol.ts.
+// USER_CHANGED, GEO_SYNC_CHANGED. This control channel carries no device-state
+// model; the dedicated device-rpc channel carries opaque bytes and the app
+// subscribes to SDK listeners natively. Wire shapes live in protocol.ts.
 //
 // The one exception to "device state does not flow through the bridge" is
 // SET_PROVIDER_LOCATIONS, and it is a data-source decision, not a sync
 // channel: the geolocation override (content/geo-main.ts) needs the oldest
 // connected provider's coordinates, and only the app holds a DeviceRemote —
-// the extension has no device plane at all. The contract with the app is:
+// the extension owns transport but no Device implementation. The contract is:
 //
 //   1. on GEO_SYNC_CHANGED {enabled:true} (or a GET_GEO_SYNC answer saying
 //      enabled), the app subscribes to
@@ -53,6 +52,7 @@ import {
 } from "../utils/geo-sync";
 import { STORAGE_KEY_GEO_ENABLED } from "../content/geo-protocol";
 import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
+import { closeAllDeviceRpcConnections } from "./device-rpc";
 
 const RENEW_ALARM = "urn-bridge-session-renew";
 const RENEW_RETRY_MS = 60_000;
@@ -71,10 +71,6 @@ export type BridgeSessionInfo = {
 	connected: boolean;
 	mode?: "standard" | "multi-ip";
 	instanceId?: string | null;
-	signedProxyId?: string;
-	proxyHost?: string;
-	httpsProxyPort?: number;
-	apiBaseUrl?: string | null;
 	clientId?: string | null;
 	expirationTime?: string;
 	locationId?: string | null;
@@ -122,15 +118,17 @@ async function getSessionInfo(): Promise<BridgeSessionInfo> {
 		const recordedHost = record
 			? `${record.signedProxyId}.${record.proxyHost}`.toLowerCase()
 			: null;
-		if (record && configuredHost === recordedHost) {
+		if (
+			record &&
+			configuredHost === recordedHost &&
+			state.config.port === record.httpsProxyPort
+		) {
 			return {
 				connected: true,
 				mode: "standard",
-				instanceId: record.instanceId ?? null,
-				signedProxyId: record.signedProxyId,
-				proxyHost: record.proxyHost,
-				httpsProxyPort: record.httpsProxyPort,
-				apiBaseUrl: record.apiBaseUrl,
+				// An older record may predate apiBaseUrl. Keep the proxy connected but
+				// do not advertise an attachable device until a complete session exists.
+				instanceId: record.apiBaseUrl ? record.instanceId : null,
 				clientId: record.clientId,
 				expirationTime: record.expirationTime,
 				locationId: record.locationId,
@@ -147,14 +145,10 @@ async function getSessionInfo(): Promise<BridgeSessionInfo> {
 				connected: true,
 				mode: "standard",
 				instanceId: null,
-				signedProxyId: host.slice(0, dot),
-				proxyHost: host.slice(dot + 1),
-				httpsProxyPort: state.config.port,
-				apiBaseUrl: null,
 				clientId: await chromeStorageAdapter.getItem(STORAGE_KEY_CLIENT_ID),
 			};
 		}
-		return { connected: true, mode: "standard", instanceId: null, apiBaseUrl: null };
+		return { connected: true, mode: "standard", instanceId: null };
 	}
 
 	if (state.enabled && state.mode === "pac") {
@@ -220,7 +214,8 @@ async function connectInternal(
 		!pr?.auth_token ||
 		!pr.instance_id ||
 		!pr.proxy_host ||
-		!pr.https_proxy_port
+		!pr.https_proxy_port ||
+		(!pr.api_base_url && !pr.api_port)
 	) {
 		return {
 			ok: false,
@@ -259,6 +254,9 @@ async function connectInternal(
 		locationId,
 	};
 	await saveBridgeSession(record);
+	// Close the prior authenticated socket only after its replacement session is
+	// durable, so DeviceRemote reconnects against the new extension-owned data.
+	closeAllDeviceRpcConnections("device session changed");
 	if (newClientId) {
 		await chromeStorageAdapter.setItem(STORAGE_KEY_CLIENT_ID, newClientId);
 	}
@@ -282,6 +280,7 @@ async function disconnectInternal(
 	jwtOverride?: string | null,
 	reason: string = "disconnect",
 ): Promise<BridgeSessionInfo> {
+	closeAllDeviceRpcConnections("device session disconnected");
 	const jwt = jwtOverride !== undefined ? jwtOverride : await getJwt();
 	await chrome.alarms.clear(RENEW_ALARM);
 
@@ -598,6 +597,7 @@ function broadcast(event: string, payload: unknown): void {
 // Debounced: several handlers can fire in quick succession.
 let notifyTimer: ReturnType<typeof setTimeout> | null = null;
 export function notifySessionChanged(reason: string = "changed"): void {
+	closeAllDeviceRpcConnections(`device session ${reason}`);
 	if (notifyTimer !== null) {
 		clearTimeout(notifyTimer);
 	}
