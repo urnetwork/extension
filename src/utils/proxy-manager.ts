@@ -372,7 +372,7 @@ class ProxyManager {
 		this.state = { ...state };
 	}
 
-	/** Restore proxy state on extension startup. */
+	/** Restore saved intent without turning an observation/application failure into a disconnect. */
 	async restoreState(): Promise<void> {
 		await this.loadKillSwitch();
 
@@ -392,10 +392,10 @@ class ProxyManager {
 						this.enableMultiIp(slots);
 						return;
 					}
-				} catch (err) {
-					console.error("Failed to restore Firefox multi-IP proxy config:", err);
-					await chrome.storage.local.set({ [STORAGE_KEYS.ENABLED]: false });
-					return;
+				} catch {
+					// Preserve the original record for retry or explicit repair. A
+					// malformed record or failed listener is not a user disconnect.
+					throw new Error("Failed to restore saved Firefox multi-IP proxy config");
 				}
 			}
 
@@ -404,9 +404,8 @@ class ProxyManager {
 			if (result[STORAGE_KEYS.ENABLED] && stored) {
 				try {
 					await this.enable(stored);
-				} catch (err) {
-					console.error("Failed to restore Firefox proxy config:", err);
-					await chrome.storage.local.set({ [STORAGE_KEYS.ENABLED]: false });
+				} catch {
+					throw new Error("Failed to restore saved Firefox proxy config");
 				}
 			}
 			return;
@@ -422,9 +421,8 @@ class ProxyManager {
 		if (result[STORAGE_KEYS.ENABLED] && result[STORAGE_KEYS.CONFIG]) {
 			try {
 				await this.enable(result[STORAGE_KEYS.CONFIG] as ProxyConfig);
-			} catch (err) {
-				console.error("Failed to restore proxy config:", err);
-				await chrome.storage.local.set({ [STORAGE_KEYS.ENABLED]: false });
+			} catch {
+				throw new Error("Failed to restore saved proxy config");
 			}
 		}
 	}
