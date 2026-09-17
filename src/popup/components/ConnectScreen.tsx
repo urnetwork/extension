@@ -14,9 +14,9 @@ import {
 	UrSelectedLocation,
 	UrText,
 } from "@urnetwork/elements/react";
-import { useAuth } from "@urnetwork/sdk-js/react";
+import { useAuth } from "@urnetwork/sdk/react";
 import { getMessage } from "@/utils/i18n";
-import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
+import type { ConnectLocation } from "node_modules/@urnetwork/sdk/dist/generated";
 import { chromeStorageAdapter } from "@/utils/storage-adapter";
 import { fetchIpInfo, type IpInfo } from "@/utils/ip-info";
 import { useConnectionManager } from "@/utils/use-connection-manager";

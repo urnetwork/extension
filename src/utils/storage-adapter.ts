@@ -1,4 +1,4 @@
-import type { StorageAdapter } from "@urnetwork/sdk-js/react";
+import type { StorageAdapter } from "@urnetwork/sdk/react";
 
 export const chromeStorageAdapter: StorageAdapter = {
 	async getItem(key: string): Promise<string | null> {

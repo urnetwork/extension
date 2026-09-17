@@ -1,9 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useAPI } from "@urnetwork/sdk-js/react";
+import { useAPI } from "@urnetwork/sdk/react";
 import type {
 	ConnectLocation,
 	FindLocationsResult,
-} from "node_modules/@urnetwork/sdk-js/dist/generated";
+} from "node_modules/@urnetwork/sdk/dist/generated";
 
 const DEBOUNCE_MS = 400;
 const API_BASE = "https://api.bringyour.com";

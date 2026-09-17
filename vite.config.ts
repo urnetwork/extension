@@ -114,7 +114,7 @@ export default defineConfig({
 		viteStaticCopy({
 			targets: [
 				{
-					src: "node_modules/@urnetwork/sdk-js/wasm/*",
+					src: "node_modules/@urnetwork/sdk/wasm/*",
 					dest: "wasm",
 				},
 			],

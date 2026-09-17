@@ -28,7 +28,7 @@ const REFRESH_STAMP_AFTER_MS = GEO_POSITION_MAX_AGE_MS / 4;
 /**
  * The fields consumed from the sdk's `ConnectedProviderLocationInfo`
  * (sdk/js/src/types.ts). Declared structurally: the extension depends on
- * @urnetwork/sdk-js for REST hooks only and the published build predates this
+ * @urnetwork/sdk for REST hooks only and the published build predates this
  * type.
  */
 export type ProviderLocationInfo = {

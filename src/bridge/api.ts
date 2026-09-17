@@ -1,7 +1,7 @@
 // Plain-fetch URnetwork api calls for the background bridge service. The popup
-// uses the sdk-js react hooks for the same endpoints; the background service
+// uses the SDK React hooks for the same endpoints; the background service
 // worker calls them directly with the stored by_jwt.
-import type { AuthNetworkClientArgs } from "node_modules/@urnetwork/sdk-js/dist/generated";
+import type { AuthNetworkClientArgs } from "node_modules/@urnetwork/sdk/dist/generated";
 
 const API_BASE = "https://api.bringyour.com";
 

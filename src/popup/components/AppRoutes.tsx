@@ -2,7 +2,7 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import AuthInitial from "./AuthInitial";
 import { ConnectScreen } from "./ConnectScreen";
-import { useAuth } from "@urnetwork/sdk-js/react";
+import { useAuth } from "@urnetwork/sdk/react";
 
 const AuthRoutes: React.FC = () => (
 	<Routes>

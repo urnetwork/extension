@@ -1,5 +1,5 @@
-import type { ConnectLocation } from "node_modules/@urnetwork/sdk-js/dist/generated";
-import { parseByJwtClientId } from "@urnetwork/sdk-js/react";
+import type { ConnectLocation } from "node_modules/@urnetwork/sdk/dist/generated";
+import { parseByJwtClientId } from "@urnetwork/sdk/react";
 import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "./pac-script";
 import { chromeStorageAdapter } from "./storage-adapter";
 import { getKillSwitch } from "./kill-switch";

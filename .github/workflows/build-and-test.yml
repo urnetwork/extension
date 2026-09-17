@@ -46,7 +46,7 @@ jobs:
           cache: npm
 
       # ci, not install: the lockfile is the contract, and every dependency
-      # (@urnetwork/sdk-js and @urnetwork/localizations included) resolves from
+      # (@urnetwork/sdk and @urnetwork/localizations included) resolves from
       # the public registry, so no token is needed.
       - name: Install
         run: npm ci --no-audit --no-fund

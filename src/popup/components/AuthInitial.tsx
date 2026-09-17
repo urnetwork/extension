@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { UrButton, UrInput, UrText } from "@urnetwork/elements/react";
 import { getMessage } from "@/utils/i18n";
-import { useAuth, useAuthCodeLogin } from "@urnetwork/sdk-js/react";
+import { useAuth, useAuthCodeLogin } from "@urnetwork/sdk/react";
 
 interface JWTReceivedMessage {
 	type: "JWT_RECEIVED";
