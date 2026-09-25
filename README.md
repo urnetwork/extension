@@ -66,11 +66,20 @@ Firefox requires a temporary install through `about:debugging`. This is because 
 - [Node.js](https://nodejs.org/) 22+
 - [npm](https://www.npmjs.com/)
 - Git
+- [Go](https://go.dev/) (builds the sdk wasm)
 
-### Clone the repository
+### Clone the repositories
+
+The extension builds against the [URnetwork sdk](https://github.com/urnetwork/sdk)
+checked out beside it, not a published npm package: its TypeScript source
+(`../sdk/js/src`, aliased in `sdk-source.ts`, `tsconfig.app.json` and
+`tsconfig.sdk.json`) and its wasm (`../sdk/js/wasm`, which
+`scripts/sync-sdk.js` builds before every build when it is missing or stale).
 
 ```bash
+git clone git@github.com:urnetwork/sdk.git
 git clone git@github.com:urnetwork/extension.git
+npm ci --prefix sdk/js
 cd extension
 ```
 

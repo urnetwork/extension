@@ -87,6 +87,26 @@
     "message": "Spustit",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "Licence",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "Zdroje dat",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "URnetwork je postaven na níže uvedeném open source softwaru a datech. U každé položky je uvedena její licence a případná povinná upozornění.",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "Stránka projektu",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "Open source software",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "Máš poštu",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "Tento název sítě je již obsazen",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "Jiné",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "Heslo",

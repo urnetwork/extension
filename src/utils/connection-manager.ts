@@ -1,4 +1,4 @@
-import type { ConnectLocation } from "node_modules/@urnetwork/sdk/dist/generated";
+import type { ConnectLocation } from "./sdk-types";
 import { parseByJwtClientId } from "@urnetwork/sdk/react";
 import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "./pac-script";
 import { chromeStorageAdapter } from "./storage-adapter";

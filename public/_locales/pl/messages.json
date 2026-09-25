@@ -87,6 +87,26 @@
     "message": "Uruchom",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "Licencje",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "Źródła danych",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "URnetwork korzysta z poniższego oprogramowania open source i danych. Przy każdej pozycji podano jej licencję oraz wymagane informacje.",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "Strona projektu",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "Oprogramowanie open source",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "Masz wiadomość",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "Ta nazwa sieci jest już zajęta",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "Inne",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "Hasło",

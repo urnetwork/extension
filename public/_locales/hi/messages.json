@@ -87,6 +87,26 @@
     "message": "लॉन्च करें",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "लाइसेंस",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "डेटा श्रेय",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "URnetwork नीचे दिए गए ओपन सोर्स सॉफ़्टवेयर और डेटा से बना है। हर प्रविष्टि अपना लाइसेंस और ज़रूरी सूचना दिखाती है।",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "प्रोजेक्ट पेज",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "ओपन सोर्स सॉफ़्टवेयर",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "आपके पास एक ईमेल है",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "यह नेटवर्क नाम पहले से ही लिया जा चुका है",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "अन्य",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "पासवर्ड",

@@ -90,6 +90,13 @@ export default defineManifest({
 	host_permissions: isFirefox
 		? ["<all_urls>", "https://api.bringyour.com/*", "https://api-v4.bringyour.com/*"]
 		: ["https://api.bringyour.com/*", "https://api-v4.bringyour.com/*"],
+	// MV3's default extension-page CSP has no 'wasm-unsafe-eval', so the popup
+	// could not compile the sdk wasm. The Licenses screen reads the license
+	// list out of it (utils/licenses.ts). Otherwise the MV3 default, unchanged:
+	// no remote script, no eval.
+	content_security_policy: {
+		extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+	},
 	web_accessible_resources: [
 		{
 			resources: ["wasm/sdk.wasm", "wasm/wasm_exec.js"],

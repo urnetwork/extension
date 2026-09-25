@@ -87,6 +87,26 @@
     "message": "실행",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "라이선스",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "데이터 출처",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "URnetwork는 아래의 오픈 소스 소프트웨어와 데이터로 만들어졌습니다. 각 항목에는 해당 라이선스와 필요한 고지가 표시됩니다.",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "프로젝트 페이지",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "오픈 소스 소프트웨어",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "메일을 확인해주세요",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "이 네트워크 이름은 이미 사용 중입니다",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "기타",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "비밀번호",

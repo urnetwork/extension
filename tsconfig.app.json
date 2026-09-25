@@ -29,7 +29,13 @@
 			"@/*": ["src/*"],
 			"@urnetwork/elements/react": ["elements/src/react/index.ts"],
 			"@urnetwork/elements/components": ["elements/src/components/index.ts"],
+			// the sdk, from the sibling checkout's source (sdk-source.ts),
+			// type-checked as the referenced tsconfig.sdk.json project
+			"@urnetwork/sdk": ["../sdk/js/src/index.ts"],
+			"@urnetwork/sdk/client": ["../sdk/js/src/client.ts"],
+			"@urnetwork/sdk/react": ["../sdk/js/src/react/index.ts"],
 		},
 	},
 	"include": ["src", "elements/src"],
+	"references": [{ "path": "./tsconfig.sdk.json" }],
 }

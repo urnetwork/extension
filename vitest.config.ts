@@ -4,20 +4,21 @@
 // config is dominated by browser-packaging plugins (crxjs manifest handling,
 // the geo content-script IIFE bundler, zip-pack) that have no meaning in a
 // node test process and would drag manifest generation into every test run.
-// What the tests DO need from the build config — the `@` source alias and TS
-// handling — is replicated here. Keep the alias list in sync with
+// What the tests DO need from the build config — the `@` source alias, the
+// sdk source aliases (shared via sdk-source.ts) and TS handling — is
+// replicated here. Keep the alias list in sync with
 // vite.config.ts / tsconfig.app.json if it grows.
 //
 // Tests run in a plain node environment: the bridge background service uses no
 // DOM, and every `chrome.*` surface is provided by tests/chrome-mock.ts.
 import path from "node:path";
 import { defineConfig } from "vitest/config";
+import { sdkAliases, sdkDedupe } from "./sdk-source";
 
 export default defineConfig({
 	resolve: {
-		alias: {
-			"@": path.resolve(__dirname, "src"),
-		},
+		alias: [...sdkAliases, { find: "@", replacement: path.resolve(__dirname, "src") }],
+		dedupe: sdkDedupe,
 	},
 	test: {
 		environment: "node",

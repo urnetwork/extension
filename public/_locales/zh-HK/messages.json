@@ -87,6 +87,26 @@
     "message": "啟動",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "授權",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "數據來源",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "URnetwork 使用了以下開源軟件和數據。每一項都列出了其授權及所需的聲明。",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "項目主頁",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "開源軟件",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "你收到郵件了",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "此網絡名稱已被使用",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "其他",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "密碼",

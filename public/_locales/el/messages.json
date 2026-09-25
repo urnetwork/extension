@@ -87,6 +87,26 @@
     "message": "Εκκίνηση",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "Άδειες",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "Αναφορές δεδομένων",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "Το URnetwork είναι κατασκευασμένο με το λογισμικό ανοιχτού κώδικα και τα δεδομένα παρακάτω. Κάθε καταχώριση εμφανίζει την άδειά της και όποια ειδοποίηση απαιτεί.",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "Σελίδα έργου",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "Λογισμικό ανοιχτού κώδικα",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "Έχετε ένα email",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "Αυτό το όνομα δικτύου χρησιμοποιείται ήδη",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "Άλλο",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "Κωδικός πρόσβασης",

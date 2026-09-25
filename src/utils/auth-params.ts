@@ -1,11 +1,9 @@
-import type { ConnectLocation, AuthNetworkClientArgs } from "node_modules/@urnetwork/sdk/dist/generated";
+import type { AuthNetworkClientArgs, ConnectLocation } from "./sdk-types";
 
 // The device's IANA time zone and BCP 47 locale ride on every auth-client
 // call: the onboarding campaign sends in the user's local morning and picks
 // the email's language from them (mmm/onboarding/PLAN.md). Optional on the
-// wire; the published SDK types predate the fields, so they are typed here
-// until the package catches up.
-export type AuthNetworkClientArgsWithDevice = AuthNetworkClientArgs & { time_zone?: string; locale?: string };
+// wire.
 
 export function deviceTimeZone(): string {
 	try {
@@ -26,7 +24,7 @@ export function deviceLocale(): string {
 // Shared auth-client provisioning params. Used by the popup connection manager
 // and the background bridge service so both provision identically. No location
 // means best available.
-export function buildAuthParams(location?: ConnectLocation): AuthNetworkClientArgsWithDevice {
+export function buildAuthParams(location?: ConnectLocation): AuthNetworkClientArgs {
 	const locationConfig = location
 		? {
 				connect_location_id: {

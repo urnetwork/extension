@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuthNetworkClient, useRemoveNetworkClient } from "@urnetwork/sdk/react";
 import { ConnectionManager, type ConnectionStatus } from "./connection-manager";
-import type { ConnectLocation } from "node_modules/@urnetwork/sdk/dist/generated";
+import type { ConnectLocation } from "./sdk-types";
 
 interface UseConnectionManagerResult {
 	status: ConnectionStatus;

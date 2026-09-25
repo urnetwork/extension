@@ -87,6 +87,26 @@
     "message": "Luncurkan",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "Lisensi",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "Atribusi data",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "URnetwork dibangun dengan perangkat lunak sumber terbuka dan data di bawah ini. Setiap entri menampilkan lisensinya dan pemberitahuan apa pun yang diwajibkan.",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "Halaman proyek",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "Perangkat lunak sumber terbuka",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "Anda menerima email",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "Nama jaringan ini sudah digunakan",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "Lainnya",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "Kata sandi",

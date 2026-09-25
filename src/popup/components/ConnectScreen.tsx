@@ -15,8 +15,9 @@ import {
 	UrText,
 } from "@urnetwork/elements/react";
 import { useAuth } from "@urnetwork/sdk/react";
+import { useNavigate } from "react-router-dom";
 import { getMessage } from "@/utils/i18n";
-import type { ConnectLocation } from "node_modules/@urnetwork/sdk/dist/generated";
+import type { ConnectLocation } from "@/utils/sdk-types";
 import { chromeStorageAdapter } from "@/utils/storage-adapter";
 import { fetchIpInfo, type IpInfo } from "@/utils/ip-info";
 import { useConnectionManager } from "@/utils/use-connection-manager";
@@ -42,8 +43,16 @@ function locationKey(location?: ConnectLocation): string {
 	return location.name ?? "";
 }
 
+// A React key unique within a list. locationKey is the color/flag key and is
+// shared by every location in a country.
+function listKey(location: ConnectLocation): string {
+	const id = location.connect_location_id;
+	return id?.location_id ?? id?.location_group_id ?? id?.client_id ?? location.name ?? "";
+}
+
 export const ConnectScreen: React.FC = () => {
 	const { clearAuth } = useAuth();
+	const navigate = useNavigate();
 	const { status, error: connectionError, connect, disconnect, reattach, onProxyChange } =
 		useConnectionManager();
 
@@ -353,6 +362,9 @@ export const ConnectScreen: React.FC = () => {
 						<UrMenuButton>
 							<UrIconHamburger className="size-5 opacity-60 hover:opacity-100 transition-opacity" />
 						</UrMenuButton>
+						<MenuItem className="text-left" onMenuItemClick={() => navigate("/licenses")}>
+							<UrText>{getMessage("licenses")}</UrText>
+						</MenuItem>
 						<MenuItem className="text-left" onMenuItemClick={handleLogout}>
 							<UrText>Logout</UrText>
 						</MenuItem>
@@ -529,7 +541,7 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsSection label={getMessage("best_matches")}>
 								{filteredLocations.best_matches.map((location) => (
 									<UrLocationListItem
-										key={locationKey(location)}
+										key={listKey(location)}
 										locationKey={locationKey(location)}
 										name={location.name}
 										providerCount={location.provider_count}
@@ -545,7 +557,7 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsSection label={getMessage("countries")}>
 								{filteredLocations.countries.map((location) => (
 									<UrLocationListItem
-										key={locationKey(location)}
+										key={listKey(location)}
 										locationKey={locationKey(location)}
 										name={location.name}
 										providerCount={location.provider_count}
@@ -570,7 +582,7 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsSection label={getMessage("cities")}>
 								{filteredLocations.cities.map((location) => (
 									<UrLocationListItem
-										key={locationKey(location)}
+										key={listKey(location)}
 										locationKey={locationKey(location)}
 										name={location.name}
 										providerCount={location.provider_count}
@@ -586,7 +598,7 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsSection label={getMessage("regions")}>
 								{filteredLocations.regions.map((location) => (
 									<UrLocationListItem
-										key={locationKey(location)}
+										key={listKey(location)}
 										locationKey={locationKey(location)}
 										name={location.name}
 										providerCount={location.provider_count}
@@ -602,7 +614,7 @@ export const ConnectScreen: React.FC = () => {
 							<LocationsSection label={getMessage("devices")}>
 								{filteredLocations.devices.map((location) => (
 									<UrLocationListItem
-										key={locationKey(location)}
+										key={listKey(location)}
 										locationKey={locationKey(location)}
 										name={location.name}
 										providerCount={location.provider_count}
@@ -639,27 +651,34 @@ const RegionGroupedList: React.FC<{
 }> = ({ groups, onSelectLocation }) => (
 	<div className="mb-2">
 		<div className="sticky top-0 z-10 py-2 px-1" style={{ background: "var(--color-surface-0)" }}>
-			<span className="text-[11px] font-semibold uppercase tracking-wider opacity-40">Regions</span>
+			<span className="text-[11px] font-semibold uppercase tracking-wider opacity-40">{getMessage("regions")}</span>
 		</div>
 		{groups.map((group) => (
-			<div key={locationKey(group.region)} className="mb-2">
-				{/* Region header */}
-				<div className="rounded-xl overflow-hidden" style={{ background: "var(--color-surface-1)" }}>
-					<UrLocationListItem
-						locationKey={locationKey(group.region)}
-						name={group.region.name}
-						providerCount={group.region.provider_count}
-						onClick={() => onSelectLocation(group.region)}
-						strongPrivacy={group.region.strong_privacy}
-						unstable={!group.region.stable}
-					/>
-				</div>
+			<div key={group.region ? listKey(group.region) : "__other__"} className="mb-2">
+				{/* Region header; the sdk's region-less group (cities whose region
+				    is not in the result) is a label, not a location */}
+				{group.region ? (
+					<div className="rounded-xl overflow-hidden" style={{ background: "var(--color-surface-1)" }}>
+						<UrLocationListItem
+							locationKey={locationKey(group.region)}
+							name={group.region.name}
+							providerCount={group.region.provider_count}
+							onClick={() => group.region && onSelectLocation(group.region)}
+							strongPrivacy={group.region.strong_privacy}
+							unstable={!group.region.stable}
+						/>
+					</div>
+				) : (
+					<div className="py-1 px-1" data-testid="region-group-other">
+						<span className="text-[11px] font-semibold opacity-60">{getMessage("other")}</span>
+					</div>
+				)}
 				{/* Nested cities */}
 				{group.cities.length > 0 && (
 					<div className="ml-4 mt-1 rounded-xl overflow-hidden" style={{ background: "var(--color-surface-1)" }}>
 						{group.cities.map((city) => (
 							<UrLocationListItem
-								key={locationKey(city)}
+								key={listKey(city)}
 								locationKey={locationKey(city)}
 								name={city.name}
 								providerCount={city.provider_count}

@@ -87,6 +87,26 @@
     "message": "Запустити",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "Ліцензії",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "Джерела даних",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "URnetwork створено з використанням наведеного нижче програмного забезпечення з відкритим кодом і даних. Для кожного запису вказано його ліцензію та обов’язкові повідомлення.",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "Сторінка проєкту",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "ПЗ з відкритим кодом",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "Вам надійшов лист",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "Ця назва мережі вже зайнята",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "Інше",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "Пароль",

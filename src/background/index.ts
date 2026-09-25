@@ -8,6 +8,8 @@ import { initBridge, notifySessionChanged, handleExtensionLocationChange } from 
 import { initDeviceRpcBridge } from "../bridge/device-rpc";
 import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
 import type { FirefoxGlobal } from "../types/firefox-webext";
+import { extensionApiClient } from "../utils/api-client";
+import { isURNetworkApiError } from "@urnetwork/sdk/client";
 
 const HEALTH_ALARM_NAME = "node-health-check";
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
@@ -147,19 +149,18 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 async function completeSsoLogin(code: string): Promise<void> {
-	const response = await fetch("https://api.bringyour.com/auth/code-login", {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ auth_code: code }),
-	});
-
-	if (!response.ok) {
-		console.error("SSO code-login failed:", response.status);
+	let jwt: string | undefined;
+	try {
+		// public route: no Authorization is sent
+		const result = await extensionApiClient().authCodeLogin({ auth_code: code });
+		jwt = result.by_jwt;
+	} catch (error) {
+		console.error(
+			"SSO code-login failed:",
+			isURNetworkApiError(error) && error.kind === "http" ? error.status : error,
+		);
 		return;
 	}
-
-	const result = await response.json();
-	const jwt = result.by_jwt;
 	if (!jwt) {
 		console.error("SSO code-login returned no JWT");
 		return;

@@ -2,6 +2,7 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import AuthInitial from "./AuthInitial";
 import { ConnectScreen } from "./ConnectScreen";
+import { LicensesScreen } from "./LicensesScreen";
 import { useAuth } from "@urnetwork/sdk/react";
 
 const AuthRoutes: React.FC = () => (
@@ -13,6 +14,7 @@ const AuthRoutes: React.FC = () => (
 const MainRoutes: React.FC = () => (
 	<Routes>
 		<Route path="/" element={<ConnectScreen />} />
+		<Route path="/licenses" element={<LicensesScreen />} />
 	</Routes>
 );
 

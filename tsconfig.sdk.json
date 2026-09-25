@@ -1,0 +1,37 @@
+{
+	// The URnetwork JS SDK, type-checked from the sibling checkout's source
+	// (../sdk/js/src, see sdk-source.ts) as its own project, under the sdk's
+	// own compiler options (sdk/js/tsconfig.json) and its own dev types
+	// (../sdk/js/node_modules: `npm ci` there, which `make -C ../sdk/js build`
+	// does). The app project references it, so `tsc -b` checks it with
+	// these options and the app consumes its declarations — the extension's
+	// stricter flags (verbatimModuleSyntax, react-jsx, React 19 types) apply
+	// to the extension's code only.
+	"compilerOptions": {
+		"composite": true,
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.sdk.tsbuildinfo",
+		"rootDir": "../sdk/js/src",
+		"outDir": "./node_modules/.tmp/sdk-types",
+		"declaration": true,
+		"emitDeclarationOnly": true,
+
+		"target": "ES2020",
+		"lib": ["ES2020", "DOM"],
+		"jsx": "react",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"isolatedModules": true,
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitReturns": true,
+		"skipLibCheck": true,
+		"typeRoots": ["../sdk/js/node_modules/@types"]
+	},
+	"include": ["../sdk/js/src/**/*"]
+}

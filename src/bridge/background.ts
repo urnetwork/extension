@@ -51,7 +51,7 @@ import {
 	storeProviderLocations,
 } from "../utils/geo-sync";
 import { STORAGE_KEY_GEO_ENABLED } from "../content/geo-protocol";
-import type { ConnectLocation } from "node_modules/@urnetwork/sdk/dist/generated";
+import type { ConnectLocation } from "../utils/sdk-types";
 import { closeAllDeviceRpcConnections } from "./device-rpc";
 
 const RENEW_ALARM = "urn-bridge-session-renew";

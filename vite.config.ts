@@ -7,6 +7,7 @@ import manifest from "./manifest.config.js";
 import { name, version } from "./package.json";
 import tailwindcss from "@tailwindcss/vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
+import { SDK_JS, sdkAliases, sdkDedupe } from "./sdk-source";
 
 const isFirefox = process.env.BROWSER_TARGET === "firefox";
 const outDir = isFirefox ? "dist-firefox" : "dist";
@@ -99,14 +100,17 @@ export default defineConfig({
 		outDir,
 	},
 	resolve: {
-		alias: {
+		alias: [
+			// the sdk is consumed from the sibling checkout's source (sdk-source.ts)
+			...sdkAliases,
 			// elements is maintained in-repo under elements/ and consumed
 			// directly from source
-			"@urnetwork/elements/styles.css": `${path.resolve(__dirname, "elements/src/index.css")}`,
-			"@urnetwork/elements/react": `${path.resolve(__dirname, "elements/src/react/index.ts")}`,
-			"@urnetwork/elements/components": `${path.resolve(__dirname, "elements/src/components/index.ts")}`,
-			"@": `${path.resolve(__dirname, "src")}`,
-		},
+			{ find: "@urnetwork/elements/styles.css", replacement: path.resolve(__dirname, "elements/src/index.css") },
+			{ find: "@urnetwork/elements/react", replacement: path.resolve(__dirname, "elements/src/react/index.ts") },
+			{ find: "@urnetwork/elements/components", replacement: path.resolve(__dirname, "elements/src/components/index.ts") },
+			{ find: "@", replacement: path.resolve(__dirname, "src") },
+		],
+		dedupe: sdkDedupe,
 	},
 	plugins: [
 		react(),
@@ -114,7 +118,9 @@ export default defineConfig({
 		viteStaticCopy({
 			targets: [
 				{
-					src: "node_modules/@urnetwork/sdk/wasm/*",
+					// built (or checked fresh) by scripts/sync-sdk.js before every
+					// build; the Licenses screen and the location list load it
+					src: `${SDK_JS}/wasm/*`,
 					dest: "wasm",
 				},
 			],
@@ -131,6 +137,8 @@ export default defineConfig({
 		tailwindcss(),
 	],
 	server: {
+		// the sdk source lives outside this package's root
+		fs: { allow: [__dirname, SDK_JS] },
 		cors: {
 			origin: [/chrome-extension:\/\//],
 		},

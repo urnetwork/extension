@@ -87,6 +87,26 @@
     "message": "เปิดใช้งาน",
     "description": "Button text for entering the one-time authentication code and entering the app"
   },
+  "licenses": {
+    "message": "สัญญาอนุญาต",
+    "description": "Settings row and screen title: the open source licenses and data attributions the app includes"
+  },
+  "licenses_data_header": {
+    "message": "แหล่งที่มาของข้อมูล",
+    "description": "Licenses screen: section header for the data sources (IP location, blocklists, maps)"
+  },
+  "licenses_intro": {
+    "message": "URnetwork สร้างขึ้นด้วยซอฟต์แวร์โอเพนซอร์สและข้อมูลด้านล่าง แต่ละรายการแสดงสัญญาอนุญาตและประกาศที่จำเป็น",
+    "description": "Licenses screen: the paragraph above the list"
+  },
+  "licenses_project_page": {
+    "message": "หน้าโครงการ",
+    "description": "Licenses detail: link to the component's project home page"
+  },
+  "licenses_software_header": {
+    "message": "ซอฟต์แวร์โอเพนซอร์ส",
+    "description": "Licenses screen: section header for the open source libraries and fonts"
+  },
   "login_verify_header": {
     "message": "คุณได้รับอีเมลใหม่",
     "description": "Header for verify screen"
@@ -138,6 +158,10 @@
   "network_name_taken": {
     "message": "ชื่อเครือข่ายนี้ถูกใช้ไปแล้ว",
     "description": "Error for network name input to display when a network name is already taken."
+  },
+  "other": {
+    "message": "อื่นๆ",
+    "description": "Used in Main/Account/Wallets/ConnectWalletSheet/ConnectWalletSheetView.swift."
   },
   "password_label": {
     "message": "รหัสผ่าน",

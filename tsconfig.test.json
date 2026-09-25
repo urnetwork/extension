@@ -8,5 +8,7 @@
 		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
 		"types": ["vite/client", "chrome", "node"]
 	},
-	"include": ["tests"]
+	"include": ["tests"],
+	// not inherited through "extends"; test:types builds it first
+	"references": [{ "path": "./tsconfig.sdk.json" }]
 }

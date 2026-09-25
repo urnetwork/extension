@@ -7,7 +7,8 @@
 # lag the sibling localizations checkout — so after install this overlays the
 # local store into node_modules, then builds both targets like `make` does.
 # The prebuild step (scripts/build-locales.js) regenerates public/_locales
-# from the overlaid store.
+# from the overlaid store. The sdk needs no overlay: it is always the sibling
+# checkout (../sdk/js), see sdk-source.ts.
 #
 # Usage:
 #   ./build.sh
@@ -25,6 +26,13 @@ rsync -a --delete "$root/localizations/keys/" \
     "$here/node_modules/@urnetwork/localizations/keys/"
 cp "$root/localizations/index.js" \
     "$here/node_modules/@urnetwork/localizations/index.js"
+
+# The sdk is not an npm dependency: its TS source and wasm come straight from
+# the sibling checkout (sdk-source.ts, scripts/sync-sdk.js), so there is
+# nothing to overlay. The builds below build its wasm when missing or stale.
+
+echo "== license list drift check"
+(cd "$here" && make license-check)
 
 echo "== build (chrome + firefox)"
 (cd "$here" && npm run build && npm run build:firefox)
