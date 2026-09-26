@@ -7,13 +7,10 @@ clean:
 # the build when the extension's runtime npm dependencies (package-lock.json)
 # drift from that list: regenerate it in the sdk with `go run ./licenses`.
 # ~/urnetwork is a monoroot of sibling repos; skipped only when ../sdk is not
-# checked out next to this one.
+# checked out next to this one. The release harness forks its Go module into
+# ../sdk/vNNNN while leaving the JS SDK at ../sdk/js.
 license-check:
-	@if [ -d ../sdk ]; then \
-		go -C ../sdk run ./licenses -check extension; \
-	else \
-		echo "license-check: ../sdk not checked out, skipping"; \
-	fi
+	node scripts/check-licenses.js
 
 build: license-check
 	npm ci
