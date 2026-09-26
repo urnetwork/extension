@@ -51,6 +51,9 @@ export function buildAuthParams(location?: ConnectLocation): AuthNetworkClientAr
 			enable_socks: true,
 			enable_http: true,
 			http_require_auth: false,
+			// Keep the server's defaults: URL-token HTTPS auth, no WireGuard leg.
+			https_require_auth: false,
+			enable_wg: false,
 			initial_device_state: {
 				location: locationConfig,
 				performance_profile: null,

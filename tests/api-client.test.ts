@@ -51,6 +51,9 @@ describe("bridge authNetworkClient", () => {
 		expect(calls[0].method).toBe("POST");
 		expect(calls[0].headers.get("Authorization")).toBe("Bearer network.jwt");
 		expect(calls[0].body).toEqual(JSON.parse(JSON.stringify(args)));
+		expect(calls[0].body).toMatchObject({
+			proxy_config: { https_require_auth: false, enable_wg: false },
+		});
 		expect(result.by_client_jwt).toBe("client.jwt");
 		expect(result.proxy_config_result?.instance_id).toBe("i");
 		expect(result.error).toBeFalsy();
