@@ -22,6 +22,7 @@ import {
 	wireWindow,
 } from "../performance-profiles";
 
+// a provisioned session for `clientId`, valid for an hour
 function provisioned(clientId: string) {
 	return {
 		by_client_jwt: makeJwt({ client_id: clientId }),

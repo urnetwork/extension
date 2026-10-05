@@ -28,6 +28,7 @@ export function wireWindow(min: number, max: number) {
 	};
 }
 
+// the wire profile for `windowType` and `windowSize`, with both flags off
 export function wireProfile(windowType: string, windowSize: ReturnType<typeof wireWindow> | null) {
 	return {
 		window_type: windowType,

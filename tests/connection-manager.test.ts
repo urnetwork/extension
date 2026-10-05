@@ -9,6 +9,7 @@ import { parsePerformanceProfile, storePerformanceProfile } from "../src/utils/p
 import type { ConnectLocation } from "../src/utils/sdk-types";
 import { FIXED_IP_STREAMING, wireProfile, wireWindow } from "./performance-profiles";
 
+// the auth-client call the connection manager provisions each slot with
 type AuthNetworkClient = ConstructorParameters<typeof ConnectionManager>[0];
 
 describe("popup connect", () => {

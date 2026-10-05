@@ -21,6 +21,8 @@ import type { PerformanceProfile } from "./sdk-types";
 
 const STORAGE_KEY = "connect_performance_profile";
 
+// What STORAGE_KEY holds: the last profile ur.io handed over, and the network
+// it belongs to.
 type StoredPerformanceProfile = {
 	networkId: string;
 	performanceProfile: PerformanceProfile | null;
@@ -38,10 +40,12 @@ const WINDOW_SIZE_INTEGERS = [
 	["ulimit", "ulimit"],
 ] as const;
 
+// The error every refused profile throws.
 function invalid(): Error {
 	return new Error("Invalid performance profile");
 }
 
+// Whether `value` is a plain object (not null, not an array).
 function isObject(value: unknown): value is Record<string, unknown> {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -53,6 +57,8 @@ function windowSizeInteger(windowSize: Record<string, unknown>, key: string): nu
 	return value as number;
 }
 
+// The wire window size settings for the page's window size, or null for none.
+// Throws on a setting the sdk would not take.
 function wireWindowSize(value: unknown): NonNullable<PerformanceProfile["window_size"]> | null {
 	if (value == null) return null;
 	if (!isObject(value)) throw invalid();
