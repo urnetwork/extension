@@ -21,3 +21,10 @@ type ProxyDeviceState = NonNullable<ProxyConfig["initial_device_state"]>;
  * to buildAuthParams.
  */
 export type ConnectLocation = NonNullable<ProxyDeviceState["location"]>;
+
+/**
+ * The connect options (mode, window size, direct mode, post quantum
+ * encryption) a provisioned session's hosted device starts with. See
+ * utils/performance-profile.ts.
+ */
+export type PerformanceProfile = NonNullable<ProxyDeviceState["performance_profile"]>;

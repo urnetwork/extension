@@ -9,7 +9,7 @@
 //
 // Verbs: PING, GET_STATUS, GET_USER, GET_SESSION, SETUP, REFRESH_JWT, CONNECT,
 // DISCONNECT, GET_KILL_SWITCH, SET_KILL_SWITCH, GET_GEO_SYNC,
-// SET_PROVIDER_LOCATIONS, SET_LOCATION.
+// SET_PROVIDER_LOCATIONS, SET_LOCATION, SET_PERFORMANCE_PROFILE.
 // Events (broadcast to every connected ur.io tab): SESSION_CHANGED,
 // USER_CHANGED, GEO_SYNC_CHANGED. This control channel carries no device-state
 // model; the dedicated device-rpc channel carries opaque bytes and the app
@@ -30,6 +30,14 @@
 //
 // The extension picks the oldest entry that has coordinates and stores it (see
 // utils/geo-sync.ts). Pushes are ignored while the toggle is off.
+//
+// The connect options are provisioning input, like CONNECT's location, not
+// device state: the page applies a change to a live device itself, over the
+// device-rpc. CONNECT may carry `performanceProfile` (the profile the page
+// builds from its settings doc, in the shape its DeviceRemote takes), and
+// SET_PERFORMANCE_PROFILE hands over a changed one without reconnecting. The
+// extension keeps the last one per network and provisions every session with
+// it, renewals and popup connects included (see utils/performance-profile.ts).
 import { proxyManager } from "../utils/proxy-manager";
 import { chromeStorageAdapter } from "../utils/storage-adapter";
 import { BRIDGE_PORT_NAME, type PortRequestFrame } from "./protocol";
@@ -51,7 +59,12 @@ import {
 	storeProviderLocations,
 } from "../utils/geo-sync";
 import { STORAGE_KEY_GEO_ENABLED } from "../content/geo-protocol";
-import type { ConnectLocation } from "../utils/sdk-types";
+import {
+	loadPerformanceProfile,
+	parsePerformanceProfile,
+	storePerformanceProfile,
+} from "../utils/performance-profile";
+import type { ConnectLocation, PerformanceProfile } from "../utils/sdk-types";
 import { closeAllDeviceRpcConnections } from "./device-rpc";
 
 const RENEW_ALARM = "urn-bridge-session-renew";
@@ -197,7 +210,10 @@ async function connectInternal(
 	const location = locationId
 		? ({ connect_location_id: { location_id: locationId } } as ConnectLocation)
 		: undefined;
-	const result = await authNetworkClient(buildAuthParams(location), jwt);
+	const result = await authNetworkClient(
+		buildAuthParams(location, await loadPerformanceProfile()),
+		jwt,
+	);
 
 	if (result.error) {
 		const code = result.error.upgrade_required
@@ -479,7 +495,14 @@ async function handleVerb(
 		}
 		case "CONNECT": {
 			const locationId = typeof payload?.locationId === "string" ? payload.locationId : null;
-			const outcome = await serialize(() => connectInternal(locationId));
+			// an older page sends no connect options: provision with the kept ones
+			const performanceProfile = payloadPerformanceProfile(payload);
+			const outcome = await serialize(async () => {
+				if (performanceProfile !== undefined) {
+					await storePerformanceProfile(performanceProfile);
+				}
+				return connectInternal(locationId);
+			});
 			if (!outcome.ok) {
 				const err = new Error(outcome.error) as Error & { code?: string };
 				err.code = outcome.code;
@@ -529,10 +552,30 @@ async function handleVerb(
 			await persistLocation(locationId, name);
 			return { session: await getSessionInfo(), applied: "display" };
 		}
+		case "SET_PERFORMANCE_PROFILE": {
+			// The page's connect options changed (or it just linked): keep them
+			// for the next session this extension provisions. A live device
+			// already got the change from the page over the device-rpc, so nothing
+			// reconnects. Serialized so a CONNECT or SET_LOCATION sent after it
+			// provisions with it.
+			const performanceProfile = parsePerformanceProfile(payload?.performanceProfile);
+			return { stored: await serialize(() => storePerformanceProfile(performanceProfile)) };
+		}
 		default: {
 			throw new Error(`Unknown verb: ${verb}`);
 		}
 	}
+}
+
+// The connect options a request carries: undefined when it carries none (an
+// older page), else the wire profile. Throws on an invalid one before the
+// request changes anything.
+function payloadPerformanceProfile(
+	payload: Record<string, unknown> | undefined,
+): PerformanceProfile | null | undefined {
+	return payload?.performanceProfile === undefined
+		? undefined
+		: parsePerformanceProfile(payload.performanceProfile);
 }
 
 // Persist the current location so the popup and the renewal path stay in sync,

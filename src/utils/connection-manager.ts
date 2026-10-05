@@ -4,6 +4,7 @@ import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "./pac-script";
 import { chromeStorageAdapter } from "./storage-adapter";
 import { getKillSwitch } from "./kill-switch";
 import { buildAuthParams } from "./auth-params";
+import { loadPerformanceProfile } from "./performance-profile";
 import { clearBridgeSession } from "../bridge/session";
 import type { FirefoxGlobal } from "../types/firefox-webext";
 
@@ -155,13 +156,16 @@ export class ConnectionManager {
 
 	private async establishMultiIpConnection(location?: ConnectLocation): Promise<void> {
 		const slots: Array<{ clientId: string; slot: PacSlot; expirationTime: string }> = [];
+		// No ur.io tab attaches to these sessions, so each slot's hosted device
+		// takes the user's connect options from its provisioning alone.
+		const performanceProfile = await loadPerformanceProfile();
 
 		for (let i = 0; i < MULTI_IP_POOL_SIZE; i++) {
 			if (this.destroyed) return;
 			if (i > 0) await new Promise((r) => setTimeout(r, MULTI_IP_STAGGER_MS));
 
 			try {
-				const result = await this.authNetworkClient(buildAuthParams(location));
+				const result = await this.authNetworkClient(buildAuthParams(location, performanceProfile));
 				if (result.error || !result.by_client_jwt) continue;
 				const pr = result.proxy_config_result;
 				if (!pr?.auth_token || !pr.proxy_host || !pr.https_proxy_port) continue;
