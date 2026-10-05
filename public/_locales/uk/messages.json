@@ -63,6 +63,14 @@
     "message": "Не бачите?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "error_sending_password_reset_link": {
+    "message": "Помилка під час надсилання посилання для скидання пароля",
+    "description": "Shown when sending the password reset link fails (the request failed, or the server reports it could not send the link). Used on the password reset and account screens."
+  },
+  "error_sending_verification_code": {
+    "message": "Сталася помилка під час надсилання коду підтвердження.",
+    "description": "Inline error on the verify page when the verification code could not be sent (after sign-in, sign-up or resend). Matches the apple CreateNetworkVerifyView literal."
+  },
   "forgot_password": {
     "message": "Забули пароль?",
     "description": "Forgot your password?"
@@ -199,6 +207,10 @@
     "message": "Скинути",
     "description": "Button text for resetting password"
   },
+  "reset_link_rate_limited": {
+    "message": "Забагато спроб. Нове посилання для скидання можна запросити через {minutes} хвилини.",
+    "description": "Password reset: the server refused to send a new password reset link because of too many recent attempts. The argument is the number of minutes until a new link can be requested."
+  },
   "retry": {
     "message": "Повторити",
     "description": "Retry action label"
@@ -238,6 +250,10 @@
   "user_auth_input_placeholder": {
     "message": "Введіть свою електронну пошту або номер телефону",
     "description": "Placeholder text for the user authentication input field."
+  },
+  "verify_code_rate_limited": {
+    "message": "Забагато спроб. Новий код можна запросити через {minutes} хвилини.",
+    "description": "Verify screen: the server refused to send a new verification code because of too many recent attempts. The argument is the number of minutes until a new code can be requested."
   },
   "verify_explanation": {
     "message": "Скажіть нам, хто ви насправді. Введіть код, який ми надіслали для підтвердження вашої особи.",

@@ -63,6 +63,14 @@
     "message": "没有看到？",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "error_sending_password_reset_link": {
+    "message": "发送密码重置链接时出错",
+    "description": "Shown when sending the password reset link fails (the request failed, or the server reports it could not send the link). Used on the password reset and account screens."
+  },
+  "error_sending_verification_code": {
+    "message": "发送验证码时出错。",
+    "description": "Inline error on the verify page when the verification code could not be sent (after sign-in, sign-up or resend). Matches the apple CreateNetworkVerifyView literal."
+  },
   "forgot_password": {
     "message": "忘记密码？",
     "description": "Forgot your password?"
@@ -199,6 +207,10 @@
     "message": "重置密码",
     "description": "Button text for resetting password"
   },
+  "reset_link_rate_limited": {
+    "message": "尝试次数过多。{minutes} 分钟后可以重新获取重置链接。",
+    "description": "Password reset: the server refused to send a new password reset link because of too many recent attempts. The argument is the number of minutes until a new link can be requested."
+  },
   "retry": {
     "message": "重试",
     "description": "Retry action label"
@@ -238,6 +250,10 @@
   "user_auth_input_placeholder": {
     "message": "输入您的电子邮件或电话号码",
     "description": "Placeholder text for the user authentication input field."
+  },
+  "verify_code_rate_limited": {
+    "message": "尝试次数过多。{minutes} 分钟后可以重新获取验证码。",
+    "description": "Verify screen: the server refused to send a new verification code because of too many recent attempts. The argument is the number of minutes until a new code can be requested."
   },
   "verify_explanation": {
     "message": "告诉我们你是谁。输入我们发送给你的验证码以验证你的身份。",

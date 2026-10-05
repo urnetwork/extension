@@ -63,6 +63,14 @@
     "message": "Hauoni?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "error_sending_password_reset_link": {
+    "message": "Hitilafu wakati wa kutuma kiungo cha kuweka upya nenosiri",
+    "description": "Shown when sending the password reset link fails (the request failed, or the server reports it could not send the link). Used on the password reset and account screens."
+  },
+  "error_sending_verification_code": {
+    "message": "Hitilafu imetokea wakati wa kutuma msimbo wa uthibitishaji.",
+    "description": "Inline error on the verify page when the verification code could not be sent (after sign-in, sign-up or resend). Matches the apple CreateNetworkVerifyView literal."
+  },
   "forgot_password": {
     "message": "Umesahau nenosiri lako?",
     "description": "Forgot your password?"
@@ -199,6 +207,10 @@
     "message": "Weka upya",
     "description": "Button text for resetting password"
   },
+  "reset_link_rate_limited": {
+    "message": "Majaribio mengi mno. Unaweza kuomba kiungo kipya cha kuweka upya baada ya dakika {minutes}.",
+    "description": "Password reset: the server refused to send a new password reset link because of too many recent attempts. The argument is the number of minutes until a new link can be requested."
+  },
   "retry": {
     "message": "Jaribu tena",
     "description": "Retry action label"
@@ -238,6 +250,10 @@
   "user_auth_input_placeholder": {
     "message": "Weka barua pepe yako au nambari ya simu",
     "description": "Placeholder text for the user authentication input field."
+  },
+  "verify_code_rate_limited": {
+    "message": "Majaribio mengi mno. Unaweza kuomba msimbo mpya baada ya dakika {minutes}.",
+    "description": "Verify screen: the server refused to send a new verification code because of too many recent attempts. The argument is the number of minutes until a new code can be requested."
   },
   "verify_explanation": {
     "message": "Tuambie wewe ni nani hasa. Ingiza msimbo tuliokutumia kuthibitisha utambulisho wako.",

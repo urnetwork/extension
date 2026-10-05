@@ -63,6 +63,14 @@
     "message": "आपको यह दिखाई नहीं दे रहा है?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "error_sending_password_reset_link": {
+    "message": "पासवर्ड रीसेट लिंक भेजने में त्रुटि",
+    "description": "Shown when sending the password reset link fails (the request failed, or the server reports it could not send the link). Used on the password reset and account screens."
+  },
+  "error_sending_verification_code": {
+    "message": "सत्यापन कोड भेजने में त्रुटि हुई।",
+    "description": "Inline error on the verify page when the verification code could not be sent (after sign-in, sign-up or resend). Matches the apple CreateNetworkVerifyView literal."
+  },
   "forgot_password": {
     "message": "अपना पासवर्ड भूल गए?",
     "description": "Forgot your password?"
@@ -199,6 +207,10 @@
     "message": "इसे रीसेट करें",
     "description": "Button text for resetting password"
   },
+  "reset_link_rate_limited": {
+    "message": "बहुत अधिक प्रयास। आप {minutes} मिनट में नया रीसेट लिंक मांग सकते हैं।",
+    "description": "Password reset: the server refused to send a new password reset link because of too many recent attempts. The argument is the number of minutes until a new link can be requested."
+  },
   "retry": {
     "message": "पुनः प्रयास करें",
     "description": "Retry action label"
@@ -238,6 +250,10 @@
   "user_auth_input_placeholder": {
     "message": "अपना ईमेल या फ़ोन नंबर दर्ज करें",
     "description": "Placeholder text for the user authentication input field."
+  },
+  "verify_code_rate_limited": {
+    "message": "बहुत अधिक प्रयास। आप {minutes} मिनट में नया कोड मांग सकते हैं।",
+    "description": "Verify screen: the server refused to send a new verification code because of too many recent attempts. The argument is the number of minutes until a new code can be requested."
   },
   "verify_explanation": {
     "message": "हमें बताएं कि आप वास्तव में कौन हैं। अपनी पहचान सत्यापित करने के लिए हमारे द्वारा भेजा गया कोड दर्ज करें।",

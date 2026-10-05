@@ -63,6 +63,14 @@
     "message": "Не видите письмо?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "error_sending_password_reset_link": {
+    "message": "Ошибка при отправке ссылки для сброса пароля",
+    "description": "Shown when sending the password reset link fails (the request failed, or the server reports it could not send the link). Used on the password reset and account screens."
+  },
+  "error_sending_verification_code": {
+    "message": "Произошла ошибка при отправке кода подтверждения.",
+    "description": "Inline error on the verify page when the verification code could not be sent (after sign-in, sign-up or resend). Matches the apple CreateNetworkVerifyView literal."
+  },
   "forgot_password": {
     "message": "Забыли пароль?",
     "description": "Forgot your password?"
@@ -76,7 +84,7 @@
     "description": "Button text for beginning the login or create network process used on the Initial Auth screen."
   },
   "its_nice_to_see_you_again": {
-    "message": "Приятно снова тебя видеть",
+    "message": "Приятно снова вас видеть",
     "description": "\tGreeting text on Enter user auth password screen."
   },
   "join_urnetwork": {
@@ -199,6 +207,10 @@
     "message": "Восстановить",
     "description": "Button text for resetting password"
   },
+  "reset_link_rate_limited": {
+    "message": "Слишком много попыток. Новую ссылку для сброса можно запросить через {minutes} минуты.",
+    "description": "Password reset: the server refused to send a new password reset link because of too many recent attempts. The argument is the number of minutes until a new link can be requested."
+  },
   "retry": {
     "message": "Повторить попытку",
     "description": "Retry action label"
@@ -224,7 +236,7 @@
     "description": "Toggle that makes the device (or browser, on the extension) report a connected provider's location instead of the real location. The provider used is the most stable (longest-connected) one."
   },
   "terms_checkbox": {
-    "message": "Я принимаю {terms_start}Условия и Услуги{terms_end} и {privacy_start}Политику конфиденциальности{privacy_end} URnetwork",
+    "message": "Я принимаю {terms_start}Условия обслуживания{terms_end} и {privacy_start}Политику конфиденциальности{privacy_end} URnetwork",
     "description": "Label for the terms and conditions acceptance checkbox.\nIt should read like \"I agree to URnetwork's <link>Terms and Services</link> and <link>Privacy Policy</link>\"\n\nThe {terms_start} and {terms_end} markers wrap the \"Terms and Services\" text.\nThe {privacy_start} and {privacy_end} markers wrap the \"Privacy Policy\" text.\n\nPlatform-specific rendering:\n- Web: Replace {terms_start} with <a href=\"/terms\">, {terms_end} with </a>, etc.\n- iOS: Use these markers to identify ranges for NSAttributedString link attributes\n- Android: Use these markers to identify ranges for ClickableSpan\n"
   },
   "use_most_stable_provider": {
@@ -238,6 +250,10 @@
   "user_auth_input_placeholder": {
     "message": "Введите ваш электронный адрес или номер телефона",
     "description": "Placeholder text for the user authentication input field."
+  },
+  "verify_code_rate_limited": {
+    "message": "Слишком много попыток. Новый код можно запросить через {minutes} минуты.",
+    "description": "Verify screen: the server refused to send a new verification code because of too many recent attempts. The argument is the number of minutes until a new code can be requested."
   },
   "verify_explanation": {
     "message": "Скажите нам, кто вы на самом деле. Введите код, который мы отправили для подтверждения вашей личности.",

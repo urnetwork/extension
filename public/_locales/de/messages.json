@@ -63,6 +63,14 @@
     "message": "Siehst du ihn nicht?",
     "description": "Prompt shown when user doesn't see the verification email or SMS."
   },
+  "error_sending_password_reset_link": {
+    "message": "Fehler beim Senden des Links zum Zurücksetzen des Passworts",
+    "description": "Shown when sending the password reset link fails (the request failed, or the server reports it could not send the link). Used on the password reset and account screens."
+  },
+  "error_sending_verification_code": {
+    "message": "Beim Senden des Bestätigungscodes ist ein Fehler aufgetreten.",
+    "description": "Inline error on the verify page when the verification code could not be sent (after sign-in, sign-up or resend). Matches the apple CreateNetworkVerifyView literal."
+  },
   "forgot_password": {
     "message": "Passwort vergessen?",
     "description": "Forgot your password?"
@@ -199,6 +207,10 @@
     "message": "Zurücksetzen",
     "description": "Button text for resetting password"
   },
+  "reset_link_rate_limited": {
+    "message": "Zu viele Versuche. Du kannst in {minutes} Minuten einen neuen Link zum Zurücksetzen anfordern.",
+    "description": "Password reset: the server refused to send a new password reset link because of too many recent attempts. The argument is the number of minutes until a new link can be requested."
+  },
   "retry": {
     "message": "Erneut versuchen",
     "description": "Retry action label"
@@ -238,6 +250,10 @@
   "user_auth_input_placeholder": {
     "message": "Gib deine E-Mail oder Telefonnummer ein",
     "description": "Placeholder text for the user authentication input field."
+  },
+  "verify_code_rate_limited": {
+    "message": "Zu viele Versuche. Du kannst in {minutes} Minuten einen neuen Code anfordern.",
+    "description": "Verify screen: the server refused to send a new verification code because of too many recent attempts. The argument is the number of minutes until a new code can be requested."
   },
   "verify_explanation": {
     "message": "Sag uns, wer du wirklich bist. Gib den Code ein, den wir dir zur Identitätsprüfung gesendet haben.",
