@@ -617,13 +617,22 @@ export function hasConnectedApp(): boolean {
 // The pick carries the time it was made (pickedAt, epoch ms): every ur.io tab
 // records it as the page's newest location choice, and a tab that runs it late
 // (a frozen background tab) must not let it replace a choice made after it.
+// Only a session a page can attach a device to is delegated, the session the
+// page's hostedDeviceSessionKey accepts (standard, with a hosted instance): a
+// multi-IP session or one without an instance has no device for a page to
+// move, so the popup reconnects it itself, as when no ur.io tab is open.
 export async function handleExtensionLocationChange(
 	locationId: string | null,
 	name?: string,
 ): Promise<{ delegated: boolean }> {
 	const pickedAt = Date.now();
 	const session = await getSessionInfo();
-	if (!session.connected || ports.size === 0) {
+	if (
+		!session.connected ||
+		session.mode !== "standard" ||
+		!session.instanceId ||
+		ports.size === 0
+	) {
 		return { delegated: false };
 	}
 	await persistLocation(locationId, name);

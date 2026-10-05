@@ -4,7 +4,7 @@
 // that runs it late (a frozen background tab) must not let it replace a
 // choice made after it.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createBridgeHarness, type BridgeHarness } from "./harness";
+import { createBridgeHarness, makeJwt, NETWORK_ID, type BridgeHarness } from "./harness";
 
 describe("popup location delegation", () => {
 	let h: BridgeHarness;
@@ -42,5 +42,31 @@ describe("popup location delegation", () => {
 				payload: { locationId: null, name: null, pickedAt: 2_000 },
 			},
 		]);
+	});
+
+	// Only a session a page can attach a device to is delegated: the popup
+	// reconnects any other itself, as it does when no ur.io tab is open.
+	it("a popup pick for a multi-IP session is not delegated", async () => {
+		h.chrome.seedStorage({ by_jwt: makeJwt({ network_id: NETWORK_ID }) });
+		h.chrome.setProxyValue({ mode: "pac_script", pacScript: { data: "synthetic" } });
+		const page = h.connect("https://ur.io/app");
+
+		await expect(
+			h.bridge.handleExtensionLocationChange("synthetic-location-x", "Synthetic X"),
+		).resolves.toEqual({ delegated: false });
+		expect(page.events.filter((event) => event.event === "APPLY_LOCATION")).toEqual([]);
+		expect(h.chrome.storageData.has("selected_connect_location")).toBe(false);
+	});
+
+	it("a popup pick for a session without a hosted instance is not delegated", async () => {
+		const { record } = await h.seedLiveSession();
+		// a record from before the device endpoint was kept: no page can attach
+		h.chrome.seedStorage({ bridge_session: { ...record, apiBaseUrl: null } });
+		const page = h.connect("https://ur.io/app");
+
+		await expect(
+			h.bridge.handleExtensionLocationChange("synthetic-location-x", "Synthetic X"),
+		).resolves.toEqual({ delegated: false });
+		expect(page.events.filter((event) => event.event === "APPLY_LOCATION")).toEqual([]);
 	});
 });
