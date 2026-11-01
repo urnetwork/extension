@@ -67,6 +67,7 @@ import {
 	storePerformanceProfile,
 } from "../utils/performance-profile";
 import type { ConnectLocation, PerformanceProfile } from "../utils/sdk-types";
+import { renewDelayMs } from "../utils/session-renewal";
 import { closeAllDeviceRpcConnections } from "./device-rpc";
 
 const RENEW_ALARM = "urn-bridge-session-renew";
@@ -279,13 +280,14 @@ async function connectInternal(
 		await chromeStorageAdapter.setItem(STORAGE_KEY_CLIENT_ID, newClientId);
 	}
 
-	// proactive credential renewal at 80% of the session lifetime — this runs in
-	// the background so bridge sessions renew even with no popup and no app tab
+	// proactive credential renewal at this session's own point in 70-80% of its
+	// lifetime (utils/session-renewal.ts) — this runs in the background so
+	// bridge sessions renew even with no popup and no app tab
 	if (pr.expiration_time) {
-		const expiresAt = new Date(pr.expiration_time).getTime();
-		const lifetime = expiresAt - Date.now();
-		if (lifetime > 0) {
-			chrome.alarms.create(RENEW_ALARM, { when: Date.now() + Math.floor(lifetime * 0.8) });
+		const lifetime = new Date(pr.expiration_time).getTime() - Date.now();
+		const renewIn = renewDelayMs(newClientId ?? pr.auth_token, lifetime);
+		if (renewIn !== null) {
+			chrome.alarms.create(RENEW_ALARM, { when: Date.now() + renewIn });
 		}
 	}
 
