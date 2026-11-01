@@ -6,6 +6,7 @@ import { getKillSwitch } from "./kill-switch";
 import { buildAuthParams } from "./auth-params";
 import { loadPerformanceProfile } from "./performance-profile";
 import { clearBridgeSession } from "../bridge/session";
+import { renewDelayMs } from "./session-renewal";
 import type { FirefoxGlobal } from "../types/firefox-webext";
 
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
@@ -56,6 +57,10 @@ const MIN_CONNECTED_MS = 15_000;
 const MULTI_IP_POOL_SIZE = 5;
 const MULTI_IP_STAGGER_MS = 200;
 const MULTI_IP_PING_INTERVAL_S = 300;
+
+// setTimeout's largest delay (2^31 - 1 ms, about 24.8 days); a longer one
+// fires at once
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 let lastPingAt = 0;
 
@@ -234,11 +239,16 @@ export class ConnectionManager {
 
 		this.callbacks.onProxyChange(null);
 
-		const expiresAt = new Date(slots[0].expirationTime).getTime();
-		const lifetime = expiresAt - Date.now();
-		if (lifetime > 0) {
-			const renewIn = Math.floor(lifetime * 0.8);
-			this.renewTimeoutId = setTimeout(() => this.silentRenew(), renewIn);
+		// renew at the pool's own point in 70-80% of its first slot's lifetime
+		// (utils/session-renewal.ts). Capped at setTimeout's range: past it the
+		// timer would fire at once and renew in a loop.
+		const lifetime = new Date(slots[0].expirationTime).getTime() - Date.now();
+		const renewIn = renewDelayMs(slots[0].clientId, lifetime);
+		if (renewIn !== null) {
+			this.renewTimeoutId = setTimeout(
+				() => this.silentRenew(),
+				Math.min(renewIn, MAX_TIMEOUT_MS),
+			);
 		}
 
 		this.clearPingInterval();
