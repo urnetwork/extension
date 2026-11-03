@@ -1,6 +1,5 @@
 import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
-import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "../utils/pac-script";
-import { runHealthCheck, getSortedSlots } from "../utils/node-health";
+import { performHealthCheck } from "../utils/node-health-pass";
 import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
 import { isAllowedOrigin } from "../utils/origins";
@@ -12,7 +11,6 @@ import { extensionApiClient } from "../utils/api-client";
 import { isURNetworkApiError } from "@urnetwork/sdk/client";
 
 const HEALTH_ALARM_NAME = "node-health-check";
-const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
 // app content-channel bridge (ur.io app ↔ extension)
 initBridge();
@@ -40,56 +38,6 @@ if (!isFirefox() && chrome.proxy?.onProxyError) {
 }
 
 // ── Health check system ───────────────────────────────────────────────────────
-
-async function performHealthCheck(): Promise<void> {
-	const state = proxyManager.getState();
-
-	// Firefox defensive check: if storage says we should be connected but the
-	// onRequest listener is no longer active (background was terminated and
-	// restarted), re-run restoreState() to re-register the listener immediately,
-	// then return early. The next alarm tick (up to 1 minute) will run the full
-	// health-check pass with fresh in-memory state.
-	if (isFirefox() && !proxyManager.isListenerActive()) {
-		const stored = await chrome.storage.local.get("proxy_enabled");
-		if (stored["proxy_enabled"]) {
-			await proxyManager.restoreState();
-			return;
-		}
-	}
-
-	if (!state.enabled || state.mode !== "pac") return;
-
-	const result = await chrome.storage.local.get(MULTI_IP_SLOTS_KEY);
-	const raw = result[MULTI_IP_SLOTS_KEY] as string | undefined;
-	if (!raw) return;
-
-	let slots: PacSlot[];
-	try {
-		slots = JSON.parse(raw) as PacSlot[];
-	} catch {
-		return;
-	}
-
-	if (slots.length === 0) return;
-
-	const health = await runHealthCheck(slots);
-	const sorted = getSortedSlots(slots, health);
-
-	if (isFirefox()) {
-		proxyManager.enableMultiIp(sorted);
-	} else {
-		const killSwitch = await getKillSwitch();
-		const pacScript = buildPacScript(sorted, { killSwitch });
-		const dataUrl = pacScriptToDataUrl(pacScript);
-
-		chrome.proxy.settings.set({
-			value: { mode: "pac_script", pacScript: { url: dataUrl } },
-			scope: "regular",
-		});
-	}
-
-	await chrome.storage.local.set({ [MULTI_IP_SLOTS_KEY]: JSON.stringify(sorted) });
-}
 
 function triggerEarlyHealthCheck(): void {
 	performHealthCheck().catch((err) => {
