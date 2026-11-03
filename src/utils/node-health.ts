@@ -49,23 +49,23 @@ export async function runHealthCheck(slots: PacSlot[]): Promise<NodeHealth[]> {
 	return results;
 }
 
+// The order the slots should be in: the alive ones first, otherwise as they are.
+//
+// The browser's traffic follows the PAC list's first slot, so this order is the
+// user's exit. checkNode fetches one url over whichever proxy is in use, not over
+// the slot, so a latency says nothing about its slot, and sorting by them gave a
+// new first slot, so a new exit, every pass. A dead proxy needs no sort to be left:
+// the browser moves down the list by itself.
 export function getSortedSlots(slots: PacSlot[], health: NodeHealth[]): PacSlot[] {
 	const healthMap = new Map(health.map((h) => [`${h.host}:${h.port}`, h]));
+	const alive = (slot: PacSlot) => healthMap.get(`${slot.host}:${slot.port}`)?.alive ?? false;
 
-	return [...slots].sort((a, b) => {
-		const ha = healthMap.get(`${a.host}:${a.port}`);
-		const hb = healthMap.get(`${b.host}:${b.port}`);
+	// a stable sort, so slots that compare equal keep their order
+	return [...slots].sort((a, b) => Number(alive(b)) - Number(alive(a)));
+}
 
-		// Alive nodes first
-		const aliveA = ha?.alive ?? false;
-		const aliveB = hb?.alive ?? false;
-		if (aliveA !== aliveB) return aliveA ? -1 : 1;
-
-		// Sort alive nodes by latency ascending
-		const latA = ha?.latencyMs ?? Infinity;
-		const latB = hb?.latencyMs ?? Infinity;
-		return latA - latB;
-	});
+export function isSameSlotOrder(a: PacSlot[], b: PacSlot[]): boolean {
+	return a.length === b.length && a.every((slot, i) => slot.host === b[i].host && slot.port === b[i].port);
 }
 
 export async function getStoredHealth(): Promise<NodeHealth[]> {
