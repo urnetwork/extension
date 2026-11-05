@@ -17,9 +17,10 @@ const SECOND = 1_000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
-// slots are provisioned 200 ms apart, five to a pool
-const POOL_SIZE = 5;
-const POOL_PROVISION_MS = 4 * 200;
+// one slot to a pool (src/utils/connection-manager.ts MULTI_IP_POOL_SIZE);
+// slots of a larger pool would be provisioned 200 ms apart
+const POOL_SIZE = 1;
+const POOL_PROVISION_MS = (POOL_SIZE - 1) * 200;
 
 // a synthetic client id, distinct for each i
 function sessionClientId(i: number): string {

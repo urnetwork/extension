@@ -54,7 +54,14 @@ const PING_FAILURES_FOR_DEGRADED = 2;
 const PING_FAILURES_FOR_RECONNECT = 3;
 const MIN_CONNECTED_MS = 15_000;
 
-const MULTI_IP_POOL_SIZE = 5;
+// One hosted proxy per connection (owner, 2026-11-05). The pool was five, but
+// the PAC script and Firefox's onRequest listener hand the browser the slots
+// as one ordered failover list, so only the first slot ever carried traffic,
+// while every standby was still a hosted device kept up on the proxy hosts.
+// The server caps each network's active proxies and how many it creates a
+// minute; a reconnect provisions the new slot before it releases the old one,
+// so a connection holds at most two.
+const MULTI_IP_POOL_SIZE = 1;
 const MULTI_IP_STAGGER_MS = 200;
 const MULTI_IP_PING_INTERVAL_S = 300;
 
