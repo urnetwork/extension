@@ -53,8 +53,15 @@ function listKey(location: ConnectLocation): string {
 export const ConnectScreen: React.FC = () => {
 	const { clearAuth } = useAuth();
 	const navigate = useNavigate();
-	const { status, error: connectionError, connect, disconnect, reattach, onProxyChange } =
-		useConnectionManager();
+	const {
+		status,
+		error: connectionError,
+		connect,
+		disconnect,
+		endSession,
+		reattach,
+		onProxyChange,
+	} = useConnectionManager();
 
 	const {
 		query,
@@ -205,7 +212,7 @@ export const ConnectScreen: React.FC = () => {
 					}
 				}
 				if (vpnResponse?.success && vpnResponse.state?.enabled) {
-					reattach(restoredLocation ?? undefined);
+					reattach();
 				}
 			} catch (err) {
 				if (!cancelled) console.error("Failed to load initial state:", err);
@@ -317,12 +324,13 @@ export const ConnectScreen: React.FC = () => {
 	// ── logout ───────────────────────────────────────────────────────────────
 	const handleLogout = useCallback(async () => {
 		setIsLoggingOut(true);
-		const hasActiveProxy = status === "connected" || status === "reconnecting" || status === "degraded";
-		if (hasActiveProxy) await handleDisconnect();
+		// the install's hosted proxy client belongs to the network logging out,
+		// connected or not: the background takes the proxy off and removes it
+		await endSession();
 		await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
 		clearAuth();
 		setIsLoggingOut(false);
-	}, [status, handleDisconnect, clearAuth]);
+	}, [endSession, clearAuth]);
 
 	// ── render ───────────────────────────────────────────────────────────────
 	if (isLoggingOut) {

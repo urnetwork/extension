@@ -51,6 +51,8 @@ export type ChromeMock = {
 	onConnectListeners: Array<(port: chrome.runtime.Port) => void>;
 	onAlarmListeners: Array<(alarm: chrome.alarms.Alarm) => void>;
 	onStorageChangedListeners: StorageChangeListener[];
+	/** chrome.runtime.onMessage listeners (an extension page's); tests deliver to them */
+	onMessageListeners: Array<(message: unknown) => void>;
 
 	// ---- helpers ----
 	seedStorage: (items: Record<string, unknown>) => void;
@@ -74,6 +76,7 @@ export function installChromeMock(): ChromeMock {
 	const onConnectListeners: Array<(port: chrome.runtime.Port) => void> = [];
 	const onAlarmListeners: Array<(alarm: chrome.alarms.Alarm) => void> = [];
 	const onStorageChangedListeners: StorageChangeListener[] = [];
+	const onMessageListeners: Array<(message: unknown) => void> = [];
 
 	function storageGet(keys: string | string[] | null): Record<string, unknown> {
 		const result: Record<string, unknown> = {};
@@ -137,6 +140,16 @@ export function installChromeMock(): ChromeMock {
 					onConnectListeners.push(listener);
 				},
 			},
+			onMessage: {
+				addListener: (listener: (message: unknown) => void) => {
+					onMessageListeners.push(listener);
+				},
+				removeListener: (listener: (message: unknown) => void) => {
+					const index = onMessageListeners.indexOf(listener);
+					if (0 <= index) onMessageListeners.splice(index, 1);
+				},
+				hasListener: (listener: (message: unknown) => void) => onMessageListeners.includes(listener),
+			},
 		},
 		alarms: {
 			create: (name: string, info: chrome.alarms.AlarmCreateInfo) => {
@@ -195,6 +208,7 @@ export function installChromeMock(): ChromeMock {
 		onConnectListeners,
 		onAlarmListeners,
 		onStorageChangedListeners,
+		onMessageListeners,
 		seedStorage: (items: Record<string, unknown>) => {
 			for (const [key, value] of Object.entries(items)) {
 				storageData.set(key, clone(value));

@@ -1,15 +1,17 @@
 // The connect options over the bridge: CONNECT may carry the page's profile,
-// SET_PERFORMANCE_PROFILE hands over a change, and every session the
-// extension provisions starts with the last one, renewals included. A hosted
-// device recreated with no ur.io tab open starts from that provisioning, so
-// before this it ran in Auto (rotating exits) whatever Fixed IP said.
-import { beforeEach, describe, expect, it, vi } from "vitest";
+// SET_PERFORMANCE_PROFILE hands over a change, and every client the extension
+// provisions starts with the last one, including a client a location change
+// with no ur.io tab open provisions. A hosted device made with no ur.io tab
+// open starts from that provisioning, so before this it ran in Auto (rotating
+// exits) whatever Fixed IP said. The install's one client is reused at its own
+// location (bridge/background.ts); the page changes a live device's options
+// over the device-rpc.
+import { beforeEach, describe, expect, it } from "vitest";
 import {
 	createBridgeHarness,
 	makeJwt,
 	NETWORK_ID,
 	OTHER_NETWORK_ID,
-	RENEW_ALARM,
 	type BridgeHarness,
 	type FakePort,
 } from "./harness";
@@ -45,13 +47,6 @@ describe("connect options over the bridge", () => {
 	const sentProfile = (call: number) =>
 		h.api.authNetworkClient.mock.calls[call][0].proxy_config.initial_device_state.performance_profile;
 
-	const renew = async (calls: number) => {
-		for (const listener of h.chrome.onAlarmListeners) {
-			listener({ name: RENEW_ALARM, scheduledTime: Date.now() });
-		}
-		await vi.waitFor(() => expect(h.api.authNetworkClient).toHaveBeenCalledTimes(calls));
-	};
-
 	beforeEach(async () => {
 		h = await createBridgeHarness();
 		app = h.connect();
@@ -67,19 +62,20 @@ describe("connect options over the bridge", () => {
 		expect(sentProfile(0)).toEqual(wireProfile("quality", wireWindow(1, 1)));
 	});
 
-	it("a renewal with no ur.io tab open provisions with the same options", async () => {
+	it("a popup location change with no ur.io tab open provisions with the same options", async () => {
 		await app.request("SETUP", { jwt: makeJwt({ network_id: NETWORK_ID }) });
 		await app.request("CONNECT", { locationId: "location-1", performanceProfile: FIXED_IP_STREAMING });
 		app.disconnectFromClient();
 
-		await renew(2);
+		await h.bridge.connectFromPopup({ connect_location_id: { location_id: "location-2" } } as never);
 
+		expect(h.api.authNetworkClient).toHaveBeenCalledTimes(2);
 		expect(sentProfile(1)).toEqual(wireProfile("speed", wireWindow(1, 1)));
 		expect(h.api.authNetworkClient.mock.calls[1][0].proxy_config.initial_device_state.location)
-			.toMatchObject({ connect_location_id: { location_id: "location-1" } });
+			.toMatchObject({ connect_location_id: { location_id: "location-2" } });
 	});
 
-	it("SET_PERFORMANCE_PROFILE keeps a change for the next session without reconnecting", async () => {
+	it("SET_PERFORMANCE_PROFILE keeps a change for the next client without reconnecting", async () => {
 		const seed = await h.seedLiveSession();
 
 		const res = await app.request("SET_PERFORMANCE_PROFILE", { performanceProfile: WEB });
@@ -91,7 +87,8 @@ describe("connect options over the bridge", () => {
 		expect(h.chrome.alarmClearCalls).toHaveLength(0);
 		expect(h.chrome.getStored("bridge_session")).toEqual(seed.record);
 
-		await renew(1);
+		// the next client, at another location, starts with the change
+		await app.request("CONNECT", { locationId: "location-9" });
 		expect(sentProfile(0)).toEqual(wireProfile("quality", wireWindow(2, 4)));
 	});
 
@@ -115,13 +112,18 @@ describe("connect options over the bridge", () => {
 		await app.request("CONNECT");
 		expect(sentProfile(0)).toBeNull();
 
+		// each new client (here, at a new location) starts with the kept options
 		await app.request("SET_PERFORMANCE_PROFILE", { performanceProfile: FIXED_IP_WEB });
-		await app.request("CONNECT");
+		await app.request("CONNECT", { locationId: "location-1" });
 		expect(sentProfile(1)).toEqual(wireProfile("quality", wireWindow(1, 1)));
 
 		// Auto is a choice too: the page's auto replaces the kept Fixed IP
-		await app.request("CONNECT", { performanceProfile: AUTO });
+		await app.request("CONNECT", { locationId: "location-2", performanceProfile: AUTO });
 		expect(sentProfile(2)).toEqual(wireProfile("auto", null));
+
+		// the saved client at its own location is reused: no new provision
+		await app.request("CONNECT", { locationId: "location-2" });
+		expect(h.api.authNetworkClient).toHaveBeenCalledTimes(3);
 	});
 
 	it("refuses invalid options before anything changes", async () => {

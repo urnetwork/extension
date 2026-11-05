@@ -1,4 +1,5 @@
-// App content-channel bridge (background side).
+// App content-channel bridge (background side), and the owner of the install's
+// one hosted proxy client.
 //
 // The ur.io app talks to the extension through a content script (content.ts)
 // that relays window.postMessage requests over a long-lived Port to this
@@ -16,6 +17,22 @@
 // carries no device-state model; the dedicated device-rpc channel carries
 // opaque bytes and the app subscribes to SDK listeners natively. Wire shapes
 // live in protocol.ts.
+//
+// The one hosted proxy client (owner, 2026-11-05: a single client per
+// extension). The first connect provisions one hosted proxy client
+// (POST /network/auth-client with a proxy config) and saves it (bridge/session.ts);
+// every later connect, from the page or the popup, applies it again as the
+// browser's one proxy (Chromium fixed_servers, Firefox proxy.onRequest) with
+// no auth-client call, a disconnect only takes the proxy off, and nothing
+// renews it: the server never expires a hosted proxy (its ProxyClient has no
+// expiration). A connect at another location moves the hosted device when a
+// ur.io tab can (handleExtensionLocationChange); otherwise it provisions a new
+// client there, applies it, and removes the one it replaced before it answers,
+// so at most two exist for a moment. Setup and logout remove the client. Every
+// client the extension stops using is released through utils/client-release.ts,
+// which keeps a failed release for a later pass: a client that is not removed
+// stays active on the server until its idle reap (about 30 days after its last
+// use), counting against the network's cap of active proxies.
 //
 // The one exception to "device state does not flow through the bridge" is
 // SET_PROVIDER_LOCATIONS, and it is a data-source decision, not a sync
@@ -38,9 +55,9 @@
 // device-rpc. CONNECT may carry `performanceProfile` (the profile the page
 // builds from its settings doc, in the shape its DeviceRemote takes), and
 // SET_PERFORMANCE_PROFILE hands over a changed one without reconnecting. The
-// extension keeps the last one per network and provisions every session with
-// it, renewals and popup connects included (see utils/performance-profile.ts).
-import { proxyManager } from "../utils/proxy-manager";
+// extension keeps the last one per network and provisions every new client
+// with it (see utils/performance-profile.ts).
+import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
 import { chromeStorageAdapter } from "../utils/storage-adapter";
 import { BRIDGE_PORT_NAME, type PortRequestFrame } from "./protocol";
 import { authNetworkClient, removeNetworkClient } from "./api";
@@ -67,15 +84,31 @@ import {
 	storePerformanceProfile,
 } from "../utils/performance-profile";
 import type { ConnectLocation, PerformanceProfile } from "../utils/sdk-types";
-import { renewDelayMs } from "../utils/session-renewal";
+import {
+	addPendingReleaseClients,
+	releaseClients,
+	removePendingReleaseClients,
+} from "../utils/client-release";
+import {
+	connectLocationKey,
+	connectLocationPageId,
+	locationIdKey,
+} from "../utils/connect-location-key";
+import { clearProxyHealth } from "../utils/proxy-health";
 import { closeAllDeviceRpcConnections } from "./device-rpc";
 
+// An older version's session renewal alarm. Nothing renews now: an alarm left
+// by one is cleared when it fires.
 const RENEW_ALARM = "urn-bridge-session-renew";
-const RENEW_RETRY_MS = 60_000;
-// keys shared with the popup connection manager (see connection-manager.ts)
 const STORAGE_KEY_CLIENT_ID = "proxy_client_id";
+// An older version's popup pool (several hosted proxies behind a PAC script or
+// a Firefox listener), replaced by the one client and released
+// (migrateLegacyMultiIp).
 const STORAGE_KEY_MULTI_CLIENT_IDS = "multi_ip_client_ids";
 const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
+// the popup's displayed pick (popup/components/ConnectScreen.tsx), stored as
+// JSON by the popup and as an object by persistLocation
+const STORAGE_KEY_SELECTED_LOCATION = "selected_connect_location";
 
 export type BridgeUser = {
 	networkId: string | null;
@@ -95,7 +128,7 @@ export type BridgeSessionInfo = {
 const ports = new Set<chrome.runtime.Port>();
 
 // Serialize connect/disconnect/setup so overlapping requests (multiple tabs,
-// renewal alarm) cannot interleave provisioning and teardown.
+// the popup) cannot interleave provisioning and teardown.
 let opChain: Promise<unknown> = Promise.resolve();
 function serialize<T>(fn: () => Promise<T>): Promise<T> {
 	const next = opChain.then(fn, fn);
@@ -106,6 +139,11 @@ function serialize<T>(fn: () => Promise<T>): Promise<T> {
 async function getJwt(): Promise<string | null> {
 	const result = await chrome.storage.local.get("by_jwt");
 	return typeof result.by_jwt === "string" && result.by_jwt ? result.by_jwt : null;
+}
+
+function jwtNetworkId(jwt: string | null): string | null {
+	const networkId = jwt ? parseJwtClaims(jwt)?.network_id : null;
+	return typeof networkId === "string" && networkId !== "" ? networkId : null;
 }
 
 async function getUser(): Promise<BridgeUser> {
@@ -120,6 +158,19 @@ async function getUser(): Promise<BridgeUser> {
 			typeof claims?.network_name === "string" ? claims.network_name : storedName,
 		guestMode: Boolean(claims?.guest_mode),
 	};
+}
+
+// the proxy the browser is given for a saved client
+function savedProxyConfig(record: BridgeSessionRecord): ProxyConfig {
+	return {
+		host: `${record.signedProxyId}.${record.proxyHost}`,
+		port: record.httpsProxyPort,
+		scheme: "https",
+	};
+}
+
+function recordLocationKey(record: BridgeSessionRecord): string {
+	return record.locationKey ?? locationIdKey(record.locationId);
 }
 
 async function getSessionInfo(): Promise<BridgeSessionInfo> {
@@ -168,39 +219,76 @@ async function getSessionInfo(): Promise<BridgeSessionInfo> {
 	}
 
 	if (state.enabled && state.mode === "pac") {
-		// multi-IP/PAC (popup-provisioned) — no single device-rpc session
+		// an older version's pool, until migrateLegacyMultiIp replaces it
 		return { connected: true, mode: "multi-ip" };
 	}
 
-	// reconcile: proxy is off, so any lingering record/alarm is stale
-	if (record) {
-		await clearBridgeSession();
-		await chrome.alarms.clear(RENEW_ALARM);
-	}
+	// the proxy is off; the install's client stays saved for the next connect
 	return { connected: false };
 }
 
-async function releaseClient(
-	clientId: string | null | undefined,
+async function storedMultiClientIds(): Promise<string[]> {
+	const raw = await chromeStorageAdapter.getItem(STORAGE_KEY_MULTI_CLIENT_IDS);
+	if (!raw) return [];
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		return Array.isArray(parsed)
+			? parsed.filter((id): id is string => typeof id === "string" && id !== "")
+			: [];
+	} catch {
+		return [];
+	}
+}
+
+// The clients the browser may be connected through right now: the saved
+// client and an older version's pool. A failure pass never releases them.
+async function liveClientIds(): Promise<string[]> {
+	const clientIds = await storedMultiClientIds();
+	const record = await loadBridgeSession();
+	if (record?.clientId) clientIds.push(record.clientId);
+	const storedClientId = await chromeStorageAdapter.getItem(STORAGE_KEY_CLIENT_ID);
+	if (storedClientId) clientIds.push(storedClientId);
+	return clientIds;
+}
+
+// Releases `clientIds` and every pending client except `liveClientIdList`
+// (utils/client-release.ts). With no jwt nothing can be released, so the
+// clients are only written down for a later pass.
+async function releaseBridgeClients(
+	clientIds: string[],
+	liveClientIdList: string[],
 	jwt: string | null,
 ): Promise<void> {
-	if (clientId && jwt) {
-		try {
-			await removeNetworkClient(clientId, jwt);
-		} catch {
-			// best effort
-		}
+	if (!jwt) {
+		await addPendingReleaseClients(clientIds.filter((id) => !liveClientIdList.includes(id)));
+		return;
 	}
+	await releaseClients(
+		clientIds,
+		liveClientIdList,
+		async (clientId) => (await removeNetworkClient(clientId, jwt)) !== false,
+	);
+}
+
+// An older version's pool is over once the one client is applied, or the
+// proxy is off: its clients are released and its keys removed.
+async function releaseLegacyPool(jwt: string | null, savedClientId: string | null): Promise<void> {
+	const legacyClientIds = await storedMultiClientIds();
+	await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
+	if (legacyClientIds.length === 0) return;
+	await addPendingReleaseClients(legacyClientIds);
+	await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
+	await releaseBridgeClients([], savedClientId ? [savedClientId] : [], jwt);
 }
 
 type ConnectOutcome =
 	| { ok: true; session: BridgeSessionInfo }
 	| { ok: false; error: string; code?: string };
 
-async function connectInternal(
-	locationId: string | null,
-	reason: "connect" | "renew" = "connect",
-): Promise<ConnectOutcome> {
+// Connects the browser through the install's one client: the saved client when
+// it is this network's and runs at `location`, else a new client at `location`
+// that replaces it.
+async function connectInternal(location: ConnectLocation | undefined): Promise<ConnectOutcome> {
 	const jwt = await getJwt();
 	if (!jwt) {
 		return {
@@ -209,14 +297,69 @@ async function connectInternal(
 			code: "not_setup",
 		};
 	}
+	const networkId = jwtNetworkId(jwt);
 
-	const location = locationId
-		? ({ connect_location_id: { location_id: locationId } } as ConnectLocation)
-		: undefined;
+	const record = await loadBridgeSession();
+	if (
+		record &&
+		(!record.networkId || record.networkId === networkId) &&
+		recordLocationKey(record) === connectLocationKey(location)
+	) {
+		return applySavedClient(record, jwt, networkId);
+	}
+	return provisionClient(location, jwt, networkId);
+}
+
+// The saved client, applied again: nothing is provisioned.
+async function applySavedClient(
+	record: BridgeSessionRecord,
+	jwt: string,
+	networkId: string | null,
+): Promise<ConnectOutcome> {
+	await proxyManager.enable(savedProxyConfig(record));
+	if (record.networkId !== networkId || record.locationKey === undefined) {
+		await saveBridgeSession({ ...record, networkId, locationKey: recordLocationKey(record) });
+	}
+	if (record.clientId) {
+		await chromeStorageAdapter.setItem(STORAGE_KEY_CLIENT_ID, record.clientId);
+	}
+	// a connect starts the health count afresh and ends a fallback to direct
+	await clearProxyHealth();
+	await releaseLegacyPool(jwt, record.clientId);
+
+	const session = await getSessionInfo();
+	broadcast("SESSION_CHANGED", { session, reason: "connect" });
+	return { ok: true, session };
+}
+
+// A new client at `location`, applied, and then the client it replaces
+// removed: the first connect, another network's saved client, or a location
+// no ur.io tab could move the hosted device to.
+async function provisionClient(
+	location: ConnectLocation | undefined,
+	jwt: string,
+	networkId: string | null,
+): Promise<ConnectOutcome> {
 	const result = await authNetworkClient(
 		buildAuthParams(location, await loadPerformanceProfile()),
 		jwt,
 	);
+
+	const claims = result.by_client_jwt ? parseJwtClaims(result.by_client_jwt) : null;
+	const newClientId = typeof claims?.client_id === "string" ? claims.client_id : null;
+	if (newClientId) {
+		// written down before anything here can fail, and taken off once it is
+		// the saved client; a client that does not become it is released, never
+		// left active on the server
+		await addPendingReleaseClients([newClientId]);
+	}
+	// what the browser is connected through until the new client replaces it
+	const replacedClientIds = (await liveClientIds()).filter((id) => id !== newClientId);
+	const releaseNewClient = async () => {
+		if (newClientId) {
+			await releaseBridgeClients([newClientId], replacedClientIds, jwt);
+		}
+	};
 
 	if (result.error) {
 		const code = result.error.upgrade_required
@@ -224,6 +367,7 @@ async function connectInternal(
 			: result.error.client_limit_exceeded
 				? "client_limit"
 				: undefined;
+		await releaseNewClient();
 		return { ok: false, error: result.error.message, code };
 	}
 
@@ -236,6 +380,7 @@ async function connectInternal(
 		!pr.https_proxy_port ||
 		(!pr.api_base_url && !pr.api_port)
 	) {
+		await releaseNewClient();
 		return {
 			ok: false,
 			error: "Incomplete proxy configuration received",
@@ -243,19 +388,15 @@ async function connectInternal(
 		};
 	}
 
-	await proxyManager.enable({
-		host: `${pr.auth_token}.${pr.proxy_host}`,
-		port: pr.https_proxy_port,
-		scheme: "https",
-	});
-
-	const claims = parseJwtClaims(result.by_client_jwt);
-	const newClientId = typeof claims?.client_id === "string" ? claims.client_id : null;
-
-	const prior = await loadBridgeSession();
-	if (prior?.clientId && prior.clientId !== newClientId) {
-		// release the replaced client (best effort, no await)
-		releaseClient(prior.clientId, jwt);
+	try {
+		await proxyManager.enable({
+			host: `${pr.auth_token}.${pr.proxy_host}`,
+			port: pr.https_proxy_port,
+			scheme: "https",
+		});
+	} catch (err) {
+		await releaseNewClient();
+		throw err;
 	}
 
 	const apiBaseUrl =
@@ -270,7 +411,9 @@ async function connectInternal(
 		httpsProxyPort: pr.https_proxy_port,
 		apiBaseUrl,
 		expirationTime: pr.expiration_time,
-		locationId,
+		locationId: connectLocationPageId(location),
+		locationKey: connectLocationKey(location),
+		networkId,
 	};
 	await saveBridgeSession(record);
 	// Close the prior authenticated socket only after its replacement session is
@@ -278,66 +421,40 @@ async function connectInternal(
 	closeAllDeviceRpcConnections("device session changed");
 	if (newClientId) {
 		await chromeStorageAdapter.setItem(STORAGE_KEY_CLIENT_ID, newClientId);
+		await removePendingReleaseClients([newClientId]);
 	}
-
-	// proactive credential renewal at this session's own point in 70-80% of its
-	// lifetime (utils/session-renewal.ts) — this runs in the background so
-	// bridge sessions renew even with no popup and no app tab
-	if (pr.expiration_time) {
-		const lifetime = new Date(pr.expiration_time).getTime() - Date.now();
-		const renewIn = renewDelayMs(newClientId ?? pr.auth_token, lifetime);
-		if (renewIn !== null) {
-			chrome.alarms.create(RENEW_ALARM, { when: Date.now() + renewIn });
-		}
+	await clearProxyHealth();
+	// The client this one replaced, and an older version's pool, are over:
+	// removed before this answers, so the network holds two clients only for
+	// this moment. A failed release stays pending for a later pass.
+	if (0 < replacedClientIds.length) {
+		await addPendingReleaseClients(replacedClientIds);
+		await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
+		await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
 	}
+	await releaseBridgeClients([], newClientId ? [newClientId] : [], jwt);
 
 	const session = await getSessionInfo();
-	broadcast("SESSION_CHANGED", { session, reason });
+	broadcast("SESSION_CHANGED", { session, reason: "connect" });
 	return { ok: true, session };
 }
 
+// Takes the proxy off. The install's client stays saved for the next connect.
 async function disconnectInternal(
-	jwtOverride?: string | null,
 	reason: string = "disconnect",
+	jwtOverride?: string | null,
 ): Promise<BridgeSessionInfo> {
 	closeAllDeviceRpcConnections("device session disconnected");
-	const jwt = jwtOverride !== undefined ? jwtOverride : await getJwt();
 	await chrome.alarms.clear(RENEW_ALARM);
-
-	const state = await proxyManager.getActualProxyState();
-	const record = await loadBridgeSession();
+	const jwt = jwtOverride !== undefined ? jwtOverride : await getJwt();
 
 	try {
 		await proxyManager.disable();
 	} catch {
 		// keep tearing down
 	}
-
-	if (state.enabled && state.mode === "pac") {
-		// popup-provisioned multi-IP teardown: release every slot client
-		try {
-			proxyManager.disableMultiIp();
-		} catch {
-			// chromium PAC: disable() above already set direct
-		}
-		const raw = await chromeStorageAdapter.getItem(STORAGE_KEY_MULTI_CLIENT_IDS);
-		if (raw) {
-			try {
-				const ids = JSON.parse(raw) as string[];
-				await Promise.allSettled(ids.map((id) => releaseClient(id, jwt)));
-			} catch {
-				// ignore
-			}
-		}
-		await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
-		await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
-	}
-
-	const clientId =
-		record?.clientId ?? (await chromeStorageAdapter.getItem(STORAGE_KEY_CLIENT_ID));
-	await releaseClient(clientId, jwt);
-	await clearBridgeSession();
-	await chromeStorageAdapter.removeItem(STORAGE_KEY_CLIENT_ID);
+	await clearProxyHealth();
+	await releaseLegacyPool(jwt, (await loadBridgeSession())?.clientId ?? null);
 	// no connection, no provider: the geolocation override stops reporting a
 	// location that nothing is exiting through any more (the toggle itself is
 	// left as the user set it)
@@ -345,6 +462,26 @@ async function disconnectInternal(
 
 	const session = await getSessionInfo();
 	broadcast("SESSION_CHANGED", { session, reason });
+	return session;
+}
+
+// Takes the proxy off and removes the install's client: the extension's
+// identity is changing (setup) or ending (logout), and the client belongs to
+// the network it leaves.
+async function endInternal(reason: string, jwtOverride?: string | null): Promise<BridgeSessionInfo> {
+	const jwt = jwtOverride !== undefined ? jwtOverride : await getJwt();
+	const record = await loadBridgeSession();
+	const storedClientId = await chromeStorageAdapter.getItem(STORAGE_KEY_CLIENT_ID);
+	// written down before the record goes, so a release that fails, or a worker
+	// that stops midway, leaves the client to a later pass
+	await addPendingReleaseClients(
+		[record?.clientId, storedClientId].filter((id): id is string => Boolean(id)),
+	);
+	await clearBridgeSession();
+	await chromeStorageAdapter.removeItem(STORAGE_KEY_CLIENT_ID);
+
+	const session = await disconnectInternal(reason, jwt);
+	await releaseBridgeClients([], [], jwt);
 	return session;
 }
 
@@ -360,7 +497,7 @@ async function setupInternal(jwt: string, networkName?: string): Promise<{ user:
 
 	// tear down any existing session under the OLD identity before replacing it
 	const oldJwt = await getJwt();
-	await disconnectInternal(oldJwt, "setup");
+	await endInternal("setup", oldJwt);
 
 	const storageData: Record<string, string> = { by_jwt: jwt };
 	const name =
@@ -385,10 +522,9 @@ async function setupInternal(jwt: string, networkName?: string): Promise<{ user:
 // a new entitlement claim; the extension only needs to start using it. Nothing
 // here requires a reconnect: the live proxy authenticates with the signed
 // proxy id (not the jwt), and every jwt consumer — connectInternal, the
-// renewal alarm, releaseClient, the popup's api calls — reads `by_jwt` from
-// storage at call time. So swapping storage makes api calls and the next
-// provision/renewal use the new jwt immediately while the proxy session keeps
-// running untouched.
+// releases, the popup's api calls — reads `by_jwt` from storage at call time.
+// So swapping storage makes api calls and the next provision use the new jwt
+// immediately while the proxy session keeps running untouched.
 //
 // Statuses (returned as data, not thrown, so the page can branch):
 //   refreshed     — jwt swapped in place
@@ -437,19 +573,23 @@ async function refreshJwtInternal(
 	return { status: "refreshed", user: await getUser() };
 }
 
-async function renewSession(): Promise<void> {
-	const record = await loadBridgeSession();
-	if (!record) return;
+function pageLocation(locationId: string | null): ConnectLocation | undefined {
+	return locationId
+		? ({ connect_location_id: { location_id: locationId } } as ConnectLocation)
+		: undefined;
+}
 
-	const outcome = await serialize(() => connectInternal(record.locationId ?? null, "renew"));
-	if (!outcome.ok) {
-		const expiresAt = record.expirationTime ? new Date(record.expirationTime).getTime() : 0;
-		if (Date.now() + RENEW_RETRY_MS < expiresAt) {
-			chrome.alarms.create(RENEW_ALARM, { when: Date.now() + RENEW_RETRY_MS });
-		} else {
-			await serialize(() => disconnectInternal(undefined, "expired"));
+async function storedPopupLocation(): Promise<ConnectLocation | undefined> {
+	const result = await chrome.storage.local.get(STORAGE_KEY_SELECTED_LOCATION);
+	const value: unknown = result[STORAGE_KEY_SELECTED_LOCATION];
+	if (typeof value === "string") {
+		try {
+			return JSON.parse(value) as ConnectLocation;
+		} catch {
+			return undefined;
 		}
 	}
+	return value && typeof value === "object" ? (value as ConnectLocation) : undefined;
 }
 
 async function handleVerb(
@@ -505,7 +645,7 @@ async function handleVerb(
 				if (performanceProfile !== undefined) {
 					await storePerformanceProfile(performanceProfile);
 				}
-				return connectInternal(locationId);
+				return connectInternal(pageLocation(locationId));
 			});
 			if (!outcome.ok) {
 				const err = new Error(outcome.error) as Error & { code?: string };
@@ -543,7 +683,7 @@ async function handleVerb(
 			const name = typeof payload?.name === "string" ? payload.name : undefined;
 			const session = await getSessionInfo();
 			if (!session.connected) {
-				const outcome = await serialize(() => connectInternal(locationId));
+				const outcome = await serialize(() => connectInternal(pageLocation(locationId)));
 				if (!outcome.ok) {
 					const err = new Error(outcome.error) as Error & { code?: string };
 					err.code = outcome.code;
@@ -558,7 +698,7 @@ async function handleVerb(
 		}
 		case "SET_PERFORMANCE_PROFILE": {
 			// The page's connect options changed (or it just linked): keep them
-			// for the next session this extension provisions. A live device
+			// for the next client this extension provisions. A live device
 			// already got the change from the page over the device-rpc, so nothing
 			// reconnects. Serialized so a CONNECT or SET_LOCATION sent after it
 			// provisions with it.
@@ -582,13 +722,14 @@ function payloadPerformanceProfile(
 		: parsePerformanceProfile(payload.performanceProfile);
 }
 
-// Persist the current location so the popup and the renewal path stay in sync,
-// without touching the proxy connection. `selected_connect_location` is the
-// popup's own display key (see ConnectScreen).
+// Persist the current location so the popup and the saved client stay in
+// sync, without touching the proxy connection: the hosted device runs at it
+// now (an app moved it over the device-rpc). `selected_connect_location` is
+// the popup's own display key (see ConnectScreen).
 async function persistLocation(locationId: string | null, name?: string): Promise<void> {
 	const record = await loadBridgeSession();
 	if (record) {
-		await saveBridgeSession({ ...record, locationId });
+		await saveBridgeSession({ ...record, locationId, locationKey: locationIdKey(locationId) });
 	}
 	if (locationId) {
 		await chrome.storage.local.set({
@@ -614,15 +755,15 @@ export function hasConnectedApp(): boolean {
 // Scenario 1: the user changed location in the EXTENSION. If an app is attached,
 // delegate the change to its DeviceRemote (device-rpc → the hosted device
 // re-routes and every attached remote gets connectLocationChange — no proxy
-// reconnect). Returns delegated=true when the app will apply it; delegated=false
-// tells the caller (popup) to change location the normal way (connect / swap).
+// reconnect and no new client). Returns delegated=true when the app will apply
+// it; delegated=false tells the caller (popup) to connect at the location the
+// normal way, which replaces the install's client.
 // The pick carries the time it was made (pickedAt, epoch ms): every ur.io tab
 // records it as the page's newest location choice, and a tab that runs it late
 // (a frozen background tab) must not let it replace a choice made after it.
 // Only a session a page can attach a device to is delegated, the session the
 // page's hostedDeviceSessionKey accepts (standard, with a hosted instance): a
-// multi-IP session or one without an instance has no device for a page to
-// move, so the popup reconnects it itself, as when no ur.io tab is open.
+// session without an instance has no device for a page to move.
 export async function handleExtensionLocationChange(
 	locationId: string | null,
 	name?: string,
@@ -642,6 +783,47 @@ export async function handleExtensionLocationChange(
 	return { delegated: true };
 }
 
+// The popup's requests (utils/connection-manager.ts, through background/index.ts):
+// the same serialized operations the page's verbs run.
+export function connectFromPopup(location: ConnectLocation | undefined): Promise<ConnectOutcome> {
+	return serialize(() => connectInternal(location));
+}
+
+export function disconnectFromPopup(): Promise<BridgeSessionInfo> {
+	return serialize(() => disconnectInternal());
+}
+
+// logout: the client goes with the identity
+export function endFromPopup(): Promise<BridgeSessionInfo> {
+	return serialize(() => endInternal("logout"));
+}
+
+export function sessionForPopup(): Promise<BridgeSessionInfo> {
+	return getSessionInfo();
+}
+
+// An older version kept a pool of hosted proxies behind a PAC script
+// (Chromium) or a listener (Firefox). On upgrade a connected pool is replaced
+// by the install's one client at the popup's last pick, and every pool client
+// is released. A failed connect leaves the pool as it is, for the next start.
+export async function migrateLegacyMultiIp(): Promise<void> {
+	const legacyClientIds = await storedMultiClientIds();
+	const stored = await chrome.storage.local.get(["proxy_enabled", MULTI_IP_SLOTS_KEY]);
+	const state = await proxyManager.getActualProxyState();
+	const poolConnected =
+		state.mode === "pac" ||
+		(Boolean(stored.proxy_enabled) && typeof stored[MULTI_IP_SLOTS_KEY] === "string");
+	if (legacyClientIds.length === 0 && !poolConnected) return;
+
+	await serialize(async () => {
+		if (poolConnected) {
+			await connectInternal(await storedPopupLocation());
+			return;
+		}
+		await releaseLegacyPool(await getJwt(), (await loadBridgeSession())?.clientId ?? null);
+	});
+}
+
 function broadcast(event: string, payload: unknown): void {
 	for (const port of ports) {
 		try {
@@ -653,8 +835,8 @@ function broadcast(event: string, payload: unknown): void {
 }
 
 // Recompute the session snapshot and broadcast it. Called from the popup
-// message handlers so app tabs stay current no matter which surface acted.
-// Debounced: several handlers can fire in quick succession.
+// message handlers and the health check so app tabs stay current no matter
+// which surface acted. Debounced: several handlers can fire in quick succession.
 let notifyTimer: ReturnType<typeof setTimeout> | null = null;
 export function notifySessionChanged(reason: string = "changed"): void {
 	closeAllDeviceRpcConnections(`device session ${reason}`);
@@ -713,9 +895,8 @@ export function initBridge(): void {
 
 	chrome.alarms.onAlarm.addListener((alarm) => {
 		if (alarm.name === RENEW_ALARM) {
-			renewSession().catch((err) => {
-				console.error("Bridge session renewal failed:", err);
-			});
+			// an older version's renewal: nothing to renew, and no new client
+			chrome.alarms.clear(RENEW_ALARM).catch(() => {});
 		}
 	});
 

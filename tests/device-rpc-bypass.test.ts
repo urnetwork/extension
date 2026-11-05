@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	chromeBypassList,
-	deviceRpcApiHost,
-	pacBypassConditions,
-	shouldBypass,
-} from "../src/utils/bypass-rules";
+import { chromeBypassList, deviceRpcApiHost, shouldBypass } from "../src/utils/bypass-rules";
 import { installChromeMock } from "./chrome-mock";
 
 const PROXY_CONFIG = {
@@ -27,20 +22,6 @@ describe("device-rpc control-host bypass", () => {
 		expect(chromeBypassList([apiHost!])).toContain("api.proxy.example.ur");
 	});
 
-	it("puts the same exact-host DIRECT rule in PAC mode", () => {
-		const source = pacBypassConditions(["api.proxy.example.ur"]);
-		const decide = new Function(
-			"host",
-			"isInNet",
-			"shExpMatch",
-			`${source}\nreturn "PROXY";`,
-		) as (host: string, isInNet: () => boolean, shExpMatch: (host: string, pattern: string) => boolean) => string;
-		const isInNet = () => false;
-		const shExpMatch = (host: string, pattern: string) => pattern === "*.local" && host.endsWith(".local");
-		expect(decide("api.proxy.example.ur", isInNet, shExpMatch)).toBe("DIRECT");
-		expect(decide("api-v4.proxy.example.ur", isInNet, shExpMatch)).toBe("PROXY");
-	});
-
 	it("installs the dynamic bypass in Chromium fixed-proxy settings", async () => {
 		vi.resetModules();
 		const chromeMock = installChromeMock();
@@ -54,25 +35,34 @@ describe("device-rpc control-host bypass", () => {
 		expect(value.rules.bypassList).not.toContain("api-v4.proxy.example.ur");
 	});
 
-	it("returns DIRECT for the control host and the proxy for api-v4 in Firefox", async () => {
-		vi.resetModules();
-		installChromeMock();
-		const listeners: Array<(details: { url: string }) => unknown> = [];
-		const onRequest = {
-			addListener: (listener: (details: { url: string }) => unknown) => listeners.push(listener),
-			removeListener: (listener: (details: { url: string }) => unknown) => {
-				const index = listeners.indexOf(listener);
-				if (0 <= index) listeners.splice(index, 1);
-			},
-			hasListener: (listener: (details: { url: string }) => unknown) => listeners.includes(listener),
-		};
-		(globalThis as { browser?: unknown }).browser = { proxy: { onRequest } };
-		const { proxyManager } = await import("../src/utils/proxy-manager");
-		await proxyManager.enable(PROXY_CONFIG);
-		expect(listeners).toHaveLength(1);
-		expect(listeners[0]({ url: "wss://api.proxy.example.ur:8444/device-rpc" })).toEqual([{ type: "direct" }]);
-		expect(listeners[0]({ url: "https://api-v4.proxy.example.ur/data" })).toEqual([
-			{ type: "https", host: PROXY_CONFIG.host, port: 8443, failoverTimeout: 5 },
-		]);
+	// the one proxy for every request; the kill switch (off by default, owner
+	// 2026-10-02) decides whether a request may fail over to direct
+	it("returns DIRECT for the control host and the one proxy for api-v4 in Firefox", async () => {
+		const proxy = { type: "https", host: PROXY_CONFIG.host, port: 8443, failoverTimeout: 5 };
+		for (const killSwitch of [undefined, false, true]) {
+			vi.resetModules();
+			const chromeMock = installChromeMock();
+			if (killSwitch !== undefined) {
+				chromeMock.seedStorage({ kill_switch_enabled: killSwitch });
+			}
+			const listeners: Array<(details: { url: string }) => unknown> = [];
+			const onRequest = {
+				addListener: (listener: (details: { url: string }) => unknown) => listeners.push(listener),
+				removeListener: (listener: (details: { url: string }) => unknown) => {
+					const index = listeners.indexOf(listener);
+					if (0 <= index) listeners.splice(index, 1);
+				},
+				hasListener: (listener: (details: { url: string }) => unknown) => listeners.includes(listener),
+			};
+			(globalThis as { browser?: unknown }).browser = { proxy: { onRequest } };
+			const { proxyManager } = await import("../src/utils/proxy-manager");
+			await proxyManager.loadKillSwitch();
+			await proxyManager.enable(PROXY_CONFIG);
+			expect(listeners).toHaveLength(1);
+			expect(listeners[0]({ url: "wss://api.proxy.example.ur:8444/device-rpc" })).toEqual([{ type: "direct" }]);
+			expect(listeners[0]({ url: "https://api-v4.proxy.example.ur/data" })).toEqual(
+				killSwitch === true ? [proxy] : [proxy, { type: "direct" }],
+			);
+		}
 	});
 });
