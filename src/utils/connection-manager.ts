@@ -1,15 +1,13 @@
+// The popup's view of the connection. The background owns the connection
+// (bridge/background.ts): the install's one hosted proxy client, applied to the
+// browser as its one proxy, and the health check that keeps watching it while
+// the popup is closed (utils/proxy-health.ts). Connect, disconnect and logout
+// are requests to the background (background/index.ts POPUP_*); this object
+// shows their outcome, and what the health check reports while the popup is
+// open. It provisions nothing itself, so a closed popup leaves no client behind.
+//
+// Not safe for concurrent use: the popup drives one instance at a time.
 import type { ConnectLocation } from "./sdk-types";
-import { parseByJwtClientId } from "@urnetwork/sdk/react";
-import { buildPacScript, pacScriptToDataUrl, type PacSlot } from "./pac-script";
-import { chromeStorageAdapter } from "./storage-adapter";
-import { getKillSwitch } from "./kill-switch";
-import { buildAuthParams } from "./auth-params";
-import { loadPerformanceProfile } from "./performance-profile";
-import { clearBridgeSession } from "../bridge/session";
-import { renewDelayMs } from "./session-renewal";
-import type { FirefoxGlobal } from "../types/firefox-webext";
-
-const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 
 export type ConnectionStatus =
 	| "idle"
@@ -25,81 +23,34 @@ export interface ConnectionManagerCallbacks {
 	onError: (message: string | null) => void;
 }
 
-type AuthNetworkClientFn = (args: ReturnType<typeof buildAuthParams>) => Promise<{
-	by_client_jwt?: string;
-	proxy_config_result: {
-		auth_token?: string;
-		proxy_host?: string;
-		https_proxy_port?: number;
-		// device-rpc endpoint base for the app bridge (https://api.<proxy_host>:<api_port>)
-		api_base_url?: string;
-		api_port?: number;
-		expiration_time: string;
-		keepalive_seconds: number;
-	} | null;
-	error?: { message: string; client_limit_exceeded: boolean } | null;
-}>;
+// Sends one message to the background and resolves its answer.
+export type BackgroundSendFn = (message: Record<string, unknown>) => Promise<unknown>;
 
-type RemoveNetworkClientFn = (clientId: string) => Promise<{ error?: unknown }>;
+type BackgroundAnswer = { success?: boolean; error?: string; code?: string } | undefined;
 
-const STORAGE_KEY_MULTI_CLIENT_IDS = "multi_ip_client_ids";
-
-const PING_URL = "https://api-v4.bringyour.com/my-ip-info";
-const PING_TIMEOUT_MS = 5_000;
-const PING_RATE_LIMIT_MS = 500;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAYS_MS = [2_000, 4_000, 8_000, 16_000, 30_000];
-const STARTUP_GRACE_MS = 12_000;
-const PING_FAILURES_FOR_DEGRADED = 2;
-const PING_FAILURES_FOR_RECONNECT = 3;
-const MIN_CONNECTED_MS = 15_000;
-
-// One hosted proxy per connection (owner, 2026-11-05). The pool was five, but
-// the PAC script and Firefox's onRequest listener hand the browser the slots
-// as one ordered failover list, so only the first slot ever carried traffic,
-// while every standby was still a hosted device kept up on the proxy hosts.
-// The server caps each network's active proxies and how many it creates a
-// minute; a reconnect provisions the new slot before it releases the old one,
-// so a connection holds at most two.
-const MULTI_IP_POOL_SIZE = 1;
-const MULTI_IP_STAGGER_MS = 200;
-const MULTI_IP_PING_INTERVAL_S = 300;
-
-// setTimeout's largest delay (2^31 - 1 ms, about 24.8 days); a longer one
-// fires at once
-const MAX_TIMEOUT_MS = 2_147_483_647;
-
-let lastPingAt = 0;
-
-function isFirefox(): boolean {
-	return Boolean((globalThis as FirefoxGlobal).browser?.proxy?.onRequest);
-}
+const CONNECT_FAILED_MESSAGE = "Failed to connect. Check your account.";
+const FELL_BACK_MESSAGE =
+	"The proxy stopped answering, so the browser went back to a direct connection. Connect to try again.";
+const UNREACHABLE_MESSAGE =
+	"The proxy is not answering. The kill switch keeps the browser offline until it does.";
 
 export class ConnectionManager {
 	private status: ConnectionStatus = "idle";
-	private location: ConnectLocation | undefined;
-	private authNetworkClient: AuthNetworkClientFn;
-	private removeNetworkClient: RemoveNetworkClientFn;
 	private callbacks: ConnectionManagerCallbacks;
-
-	private pingIntervalId: ReturnType<typeof setInterval> | null = null;
-	private renewTimeoutId: ReturnType<typeof setTimeout> | null = null;
+	private send: BackgroundSendFn;
 	private operationLock = false;
-	private consecutivePingFailures = 0;
-	private reconnectAttempts = 0;
 	private destroyed = false;
-	private connectedAt = 0;
-
-	private multiClientIds: string[] = [];
+	private readonly onBackgroundMessage = (message: unknown): void => {
+		this.backgroundMessage(message);
+	};
 
 	constructor(
-		authNetworkClient: AuthNetworkClientFn,
-		removeNetworkClient: RemoveNetworkClientFn,
 		callbacks: ConnectionManagerCallbacks,
+		send: BackgroundSendFn = (message) => chrome.runtime.sendMessage(message),
 	) {
-		this.authNetworkClient = authNetworkClient;
-		this.removeNetworkClient = removeNetworkClient;
 		this.callbacks = callbacks;
+		this.send = send;
+		chrome.runtime.onMessage?.addListener(this.onBackgroundMessage);
 	}
 
 	getStatus(): ConnectionStatus {
@@ -108,271 +59,93 @@ export class ConnectionManager {
 
 	// ── public API ─────────────────────────────────────────────────────────────
 
+	// Connects at `location` (best available without one): the background
+	// applies the install's client, or replaces it at a new location.
 	async connect(location?: ConnectLocation): Promise<void> {
-		if (this.operationLock) return;
+		if (this.operationLock || this.destroyed) return;
 		this.operationLock = true;
-		this.location = location;
-		this.reconnectAttempts = 0;
-
 		this.setStatus("connecting");
 		this.callbacks.onError(null);
-		this.clearTimers();
-
 		try {
-			await this.establishMultiIpConnection(location);
+			let answer: BackgroundAnswer;
+			try {
+				answer = (await this.send({ type: "POPUP_CONNECT", location: location ?? null })) as BackgroundAnswer;
+			} catch (err) {
+				answer = { success: false, error: err instanceof Error ? err.message : undefined };
+			}
+			if (this.destroyed) return;
+			if (answer?.success) {
+				this.setStatus("connected");
+				this.callbacks.onProxyChange(null);
+				return;
+			}
+			// the server's own reason when it refused (a plan limit, a rate limit)
+			this.setStatus("error");
+			this.callbacks.onError(answer?.error || CONNECT_FAILED_MESSAGE);
 		} finally {
-			if (!this.destroyed) this.operationLock = false;
+			this.operationLock = false;
 		}
 	}
 
+	// Takes the proxy off; the install's client stays for the next connect.
 	async disconnect(): Promise<void> {
-		if (this.destroyed) return;
-		this.destroyed = true;
-		this.operationLock = true;
-		this.clearTimers();
-
-		try {
-			const disableType = isFirefox() ? "DISABLE_FIREFOX_MULTI_IP" : "DISABLE_TAB_ISOLATION_PAC";
-			await chrome.runtime.sendMessage({ type: disableType });
-			await this.releaseMultiClientIds(this.multiClientIds);
-			this.multiClientIds = [];
-			await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
-			await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
-			await clearBridgeSession();
-		} catch {
-			// best-effort
-		}
-
-		this.setStatus("idle");
-		this.callbacks.onProxyChange(null);
+		await this.end("POPUP_DISCONNECT");
 	}
 
-	reattach(location?: ConnectLocation): void {
-		if (this.destroyed) return;
-		this.location = location;
-		this.reconnectAttempts = 0;
-		this.consecutivePingFailures = 0;
-		this.connectedAt = Date.now();
-		this.clearTimers();
-		this.setStatus("connected");
+	// Logout: takes the proxy off and removes the install's client.
+	async endSession(): Promise<void> {
+		await this.end("POPUP_END_SESSION");
+	}
 
-		this.pingIntervalId = setInterval(() => this.healthPing(), MULTI_IP_PING_INTERVAL_S * 1_000);
+	// The popup opened over a connected browser: nothing to provision.
+	reattach(): void {
+		if (this.destroyed) return;
+		this.setStatus("connected");
 	}
 
 	destroy(): void {
 		this.destroyed = true;
-		this.clearTimers();
-	}
-
-	// ── multi-IP connection ───────────────────────────────────────────────────
-
-	private async establishMultiIpConnection(location?: ConnectLocation): Promise<void> {
-		const slots: Array<{ clientId: string; slot: PacSlot; expirationTime: string }> = [];
-		// No ur.io tab attaches to these sessions, so each slot's hosted device
-		// takes the user's connect options from its provisioning alone.
-		const performanceProfile = await loadPerformanceProfile();
-
-		for (let i = 0; i < MULTI_IP_POOL_SIZE; i++) {
-			if (this.destroyed) return;
-			if (i > 0) await new Promise((r) => setTimeout(r, MULTI_IP_STAGGER_MS));
-
-			try {
-				const result = await this.authNetworkClient(buildAuthParams(location, performanceProfile));
-				if (result.error || !result.by_client_jwt) continue;
-				const pr = result.proxy_config_result;
-				if (!pr?.auth_token || !pr.proxy_host || !pr.https_proxy_port) continue;
-
-				const host = `${pr.auth_token}.${pr.proxy_host}`;
-				if (slots.some((s) => s.slot.host === host)) continue;
-
-				slots.push({
-					clientId: parseByJwtClientId(result.by_client_jwt),
-					slot: { host, port: pr.https_proxy_port },
-					expirationTime: pr.expiration_time,
-				});
-			} catch {
-				// partial pool is still usable
-			}
-		}
-
-		if (this.destroyed) return;
-
-		if (slots.length === 0) {
-			this.setStatus("error");
-			this.callbacks.onError("Failed to provision any proxy connections. Check your account.");
-			return;
-		}
-
-		let response: { success?: boolean; error?: string };
-		const slotList = slots.map((s) => s.slot);
-
-		if (isFirefox()) {
-			response = await chrome.runtime.sendMessage({
-				type: "ENABLE_FIREFOX_MULTI_IP",
-				slots: slotList,
-			});
-		} else {
-			const killSwitch = await getKillSwitch();
-			const pacScript = buildPacScript(slotList, { killSwitch });
-			const dataUrl = pacScriptToDataUrl(pacScript);
-			response = await chrome.runtime.sendMessage({
-				type: "ENABLE_TAB_ISOLATION_PAC",
-				dataUrl,
-			});
-		}
-
-		await chrome.storage.local.set({ [MULTI_IP_SLOTS_KEY]: JSON.stringify(slotList) });
-
-		if (this.destroyed) return;
-
-		if (!response?.success) {
-			this.setStatus("error");
-			this.callbacks.onError(response?.error ?? "Failed to apply multi-IP proxy settings");
-			await this.releaseMultiClientIds(slots.map((s) => s.clientId));
-			return;
-		}
-
-		await this.releaseMultiClientIds(this.multiClientIds);
-		this.multiClientIds = slots.map((s) => s.clientId);
-		await chromeStorageAdapter.setItem(
-			STORAGE_KEY_MULTI_CLIENT_IDS,
-			JSON.stringify(this.multiClientIds),
-		);
-
-		this.setStatus("connected");
-		this.consecutivePingFailures = 0;
-		this.reconnectAttempts = 0;
-		this.connectedAt = Date.now();
-
-		this.callbacks.onProxyChange(null);
-
-		// renew at the pool's own point in 70-80% of its first slot's lifetime
-		// (utils/session-renewal.ts). Capped at setTimeout's range: past it the
-		// timer would fire at once and renew in a loop.
-		const lifetime = new Date(slots[0].expirationTime).getTime() - Date.now();
-		const renewIn = renewDelayMs(slots[0].clientId, lifetime);
-		if (renewIn !== null) {
-			this.renewTimeoutId = setTimeout(
-				() => this.silentRenew(),
-				Math.min(renewIn, MAX_TIMEOUT_MS),
-			);
-		}
-
-		this.clearPingInterval();
-		this.pingIntervalId = setInterval(
-			() => this.healthPing(),
-			MULTI_IP_PING_INTERVAL_S * 1_000,
-		);
-	}
-
-	// ── silent renewal ────────────────────────────────────────────────────────
-
-	private async silentRenew(): Promise<void> {
-		if (this.destroyed || this.operationLock) return;
-		this.operationLock = true;
-		try {
-			this.clearPingInterval();
-			await this.establishMultiIpConnection(this.location);
-		} finally {
-			if (!this.destroyed) this.operationLock = false;
-		}
-	}
-
-	// ── reconnect on failure ──────────────────────────────────────────────────
-
-	private scheduleReconnect(): void {
-		if (this.destroyed || this.operationLock) return;
-		if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-			this.setStatus("error");
-			this.callbacks.onError("Connection lost. Please reconnect.");
-			this.clearTimers();
-			return;
-		}
-
-		this.setStatus("reconnecting");
-		this.clearTimers();
-
-		const delay = RECONNECT_DELAYS_MS[this.reconnectAttempts] ?? 30_000;
-		this.reconnectAttempts++;
-
-		this.renewTimeoutId = setTimeout(async () => {
-			if (this.destroyed || this.operationLock) return;
-			this.operationLock = true;
-			try {
-				await this.establishMultiIpConnection(this.location);
-			} finally {
-				if (!this.destroyed) this.operationLock = false;
-			}
-		}, delay);
-	}
-
-	// ── health ping ───────────────────────────────────────────────────────────
-
-	private async healthPing(): Promise<void> {
-		if (this.destroyed || this.operationLock) return;
-
-		const now = Date.now();
-		if (now - lastPingAt < PING_RATE_LIMIT_MS) return;
-		lastPingAt = now;
-		const age = now - this.connectedAt;
-		const inGrace = age < STARTUP_GRACE_MS;
-
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
-
-		try {
-			const res = await fetch(PING_URL, { signal: controller.signal });
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-			this.consecutivePingFailures = 0;
-
-			if (this.status === "degraded") {
-				this.setStatus("connected");
-			}
-		} catch {
-			if (inGrace) return;
-
-			this.consecutivePingFailures++;
-			const tooNew = age < MIN_CONNECTED_MS;
-
-			if (!tooNew && this.consecutivePingFailures >= PING_FAILURES_FOR_RECONNECT) {
-				this.scheduleReconnect();
-			} else if (
-				this.consecutivePingFailures >= PING_FAILURES_FOR_DEGRADED &&
-				this.status === "connected"
-			) {
-				this.setStatus("degraded");
-			}
-		} finally {
-			clearTimeout(timeoutId);
-		}
+		chrome.runtime.onMessage?.removeListener(this.onBackgroundMessage);
 	}
 
 	// ── helpers ───────────────────────────────────────────────────────────────
+
+	private async end(type: "POPUP_DISCONNECT" | "POPUP_END_SESSION"): Promise<void> {
+		if (this.destroyed) return;
+		this.operationLock = true;
+		try {
+			await this.send({ type });
+		} catch {
+			// the background tears down on its own state; nothing here to retry
+		} finally {
+			this.operationLock = false;
+		}
+		this.setStatus("idle");
+		this.callbacks.onError(null);
+		this.callbacks.onProxyChange(null);
+		this.destroy();
+	}
+
+	// what the health check reports (utils/proxy-health.ts)
+	private backgroundMessage(message: unknown): void {
+		if (this.destroyed) return;
+		const { type, outcome } = (message ?? {}) as { type?: unknown; outcome?: unknown };
+		if (type !== "PROXY_HEALTH") return;
+		if (outcome === "fell_back") {
+			this.setStatus("error");
+			this.callbacks.onError(FELL_BACK_MESSAGE);
+		} else if (outcome === "unreachable") {
+			this.setStatus("degraded");
+			this.callbacks.onError(UNREACHABLE_MESSAGE);
+		} else if (outcome === "healthy" && this.status === "degraded") {
+			this.setStatus("connected");
+			this.callbacks.onError(null);
+		}
+	}
 
 	private setStatus(s: ConnectionStatus): void {
 		if (this.status === s) return;
 		this.status = s;
 		this.callbacks.onStatusChange(s);
-	}
-
-	private async releaseMultiClientIds(ids: string[]): Promise<void> {
-		if (ids.length === 0) return;
-		await Promise.allSettled(ids.map((id) => this.removeNetworkClient(id).catch(() => {})));
-	}
-
-	private clearPingInterval(): void {
-		if (this.pingIntervalId !== null) {
-			clearInterval(this.pingIntervalId);
-			this.pingIntervalId = null;
-		}
-	}
-
-	private clearTimers(): void {
-		this.clearPingInterval();
-		if (this.renewTimeoutId !== null) {
-			clearTimeout(this.renewTimeoutId);
-			this.renewTimeoutId = null;
-		}
 	}
 }

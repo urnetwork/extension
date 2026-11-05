@@ -66,17 +66,25 @@ describe("bridge authNetworkClient", () => {
 		expect(result.error).toEqual({ message: "limit", client_limit_exceeded: true });
 	});
 
-	it("maps a non-2xx to the old status error, 402 to upgrade_required", async () => {
-		stubFetch(() => json(402, { error: { message: "payment required" } }));
+	// A refused proxy is a 402 with the server's reason (x402 answers
+	// {error: "..."}); the page shows it. It used to become "HTTP error! status: 402".
+	it("keeps the server's reason for a 402 plan limit, the status error otherwise", async () => {
+		const reason =
+			"Your plan's limit of 5 active proxies is reached. Remove a proxy to create another, or upgrade to UR Pro for more.";
+		stubFetch(() => json(402, { x402Version: 1, error: reason, accepts: [] }));
 		expect(await authNetworkClient(buildAuthParams(), "jwt")).toEqual({
 			proxy_config_result: null,
-			error: { message: "HTTP error! status: 402", client_limit_exceeded: false, upgrade_required: true },
+			error: { message: reason, client_limit_exceeded: true, upgrade_required: true },
 		});
+
+		stubFetch(() => json(402, { error: { message: "payment required" } }));
+		expect((await authNetworkClient(buildAuthParams(), "jwt")).error?.message).toBe("payment required");
 
 		stubFetch(() => json(500, {}));
 		const result = await authNetworkClient(buildAuthParams(), "jwt");
 		expect(result.error?.message).toBe("HTTP error! status: 500");
 		expect(result.error?.upgrade_required).toBe(false);
+		expect(result.error?.client_limit_exceeded).toBe(false);
 	});
 
 	it("resolves a network failure as an error result, without replaying the POST", async () => {
@@ -101,13 +109,24 @@ describe("bridge removeNetworkClient", () => {
 		expect(calls[0].body).toEqual({ client_id: "client-1" });
 	});
 
-	it("is best effort: failures never reject", async () => {
+	// A client that is not removed stays active on the server, counting against
+	// the network's proxy cap, so a failure that a retry can fix answers false
+	// (the caller keeps the client pending, utils/client-release.ts). It used to
+	// resolve undefined for every outcome, and the client was forgotten.
+	it("never rejects, and says whether the release needs a retry", async () => {
+		stubFetch(() => json(200, {}));
+		await expect(removeNetworkClient("c", "jwt")).resolves.toBe(true);
+		// a refusal will not change on a retry
 		stubFetch(() => json(401, {}));
-		await expect(removeNetworkClient("c", "jwt")).resolves.toBeUndefined();
+		await expect(removeNetworkClient("c", "jwt")).resolves.toBe(true);
+		stubFetch(() => json(503, {}));
+		await expect(removeNetworkClient("c", "jwt")).resolves.toBe(false);
+		stubFetch(() => json(429, {}));
+		await expect(removeNetworkClient("c", "jwt")).resolves.toBe(false);
 		stubFetch(() => {
 			throw new TypeError("offline");
 		});
-		await expect(removeNetworkClient("c", "jwt")).resolves.toBeUndefined();
+		await expect(removeNetworkClient("c", "jwt")).resolves.toBe(false);
 	});
 });
 

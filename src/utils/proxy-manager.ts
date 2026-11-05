@@ -1,4 +1,9 @@
-import type { PacSlot } from "./pac-script";
+// The browser's proxy settings for the install's one hosted proxy
+// (bridge/background.ts): Chromium chrome.proxy fixed_servers with one
+// singleProxy and the bypass list, Firefox a proxy.onRequest listener that
+// answers every request with the one proxy. A kill switch that is off lets a
+// Firefox request fail over to direct; on Chromium the health check takes the
+// proxy off instead (utils/proxy-health.ts).
 import { shouldBypass, chromeBypassList, deviceRpcApiHost } from "./bypass-rules";
 import { getKillSwitch } from "./kill-switch";
 import type {
@@ -17,6 +22,8 @@ export interface ProxyConfig {
 	password?: string;
 }
 
+// "pac" is only ever an older version's multi-IP pool, which the background
+// replaces on start (bridge/background.ts migrateLegacyMultiIp)
 export type ProxyMode = "fixed" | "pac" | "direct";
 
 export interface ProxyState {
@@ -46,8 +53,8 @@ class ProxyManager {
 	private state: ProxyState = { enabled: false, mode: "direct", config: null };
 	private firefoxConfig: ProxyConfig | null = null;
 	private firefoxListener: FirefoxProxyRequestListener | null = null;
-	private firefoxMultiIpSlots: PacSlot[] = [];
-	private killSwitchEnabled = true;
+	// off until loadKillSwitch reads the setting (utils/kill-switch.ts)
+	private killSwitchEnabled = false;
 
 	async loadKillSwitch(): Promise<void> {
 		this.killSwitchEnabled = await getKillSwitch();
@@ -139,69 +146,9 @@ class ProxyManager {
 			}
 		}
 		this.firefoxConfig = null;
-		this.firefoxMultiIpSlots = [];
 		// Note: this.firefoxListener is intentionally NOT nulled here. Keeping the
 		// reference allows isListenerActive() to call hasListener() after removal and
 		// correctly return false, rather than short-circuiting on the null check.
-	}
-
-	enableMultiIp(slots: PacSlot[]): void {
-		if (!isFirefoxProxyApiAvailable() || slots.length === 0) return;
-
-		const onRequest = getFirefoxProxyApi()?.onRequest;
-		// isFirefoxProxyApiAvailable() above already established this; the explicit
-		// check is what narrows the optional event for the type checker.
-		if (!onRequest) return;
-
-		this.removeFirefoxProxyListener();
-
-		this.firefoxMultiIpSlots = slots;
-
-		this.firefoxListener = (details: FirefoxProxyDetails): FirefoxProxyInfo[] => {
-			if (this.firefoxMultiIpSlots.length === 0) return [{ type: "direct" }];
-
-			try {
-				const { hostname } = new URL(details.url);
-				const apiHosts = this.firefoxMultiIpSlots
-					.map((s) => deviceRpcApiHost(s.host))
-					.filter((h): h is string => h !== null);
-				if (shouldBypass(hostname, apiHosts)) return [{ type: "direct" }];
-			} catch {
-				return [{ type: "direct" }];
-			}
-
-			const proxies: FirefoxProxyInfo[] = this.firefoxMultiIpSlots.map((s) => ({
-				type: "https" as const,
-				host: s.host,
-				port: s.port,
-				failoverTimeout: 5,
-			}));
-
-			if (!this.killSwitchEnabled) {
-				proxies.push({ type: "direct" });
-			}
-			return proxies;
-		};
-
-		onRequest.addListener(this.firefoxListener, {
-			urls: ["<all_urls>"],
-		});
-
-		this.state = { enabled: true, mode: "pac", config: null };
-		chrome.storage.local.set({ [STORAGE_KEYS.ENABLED]: true });
-	}
-
-	getMultiIpSlots(): PacSlot[] {
-		return [...this.firefoxMultiIpSlots];
-	}
-
-	disableMultiIp(): void {
-		this.removeFirefoxProxyListener();
-		this.state = { enabled: false, mode: "direct", config: null };
-		chrome.storage.local.set({
-			[STORAGE_KEYS.ENABLED]: false,
-			[STORAGE_KEYS.CONFIG]: null,
-		});
 	}
 
 	/**
@@ -211,29 +158,10 @@ class ProxyManager {
 	 */
 	async getActualProxyState(): Promise<ProxyState> {
 		if (isFirefoxProxyApiAvailable()) {
-			// In-memory slots present: listener is active
-			if (this.firefoxMultiIpSlots.length > 0) {
-				return Promise.resolve({ enabled: true, mode: "pac" as ProxyMode, config: null });
-			}
-
 			return new Promise((resolve) => {
 				chrome.storage.local.get(
-					[STORAGE_KEYS.ENABLED, STORAGE_KEYS.CONFIG, "multi_ip_slots"],
+					[STORAGE_KEYS.ENABLED, STORAGE_KEYS.CONFIG],
 					(result) => {
-						// Check storage for multi-IP mode (covers post-restart window before restoreState() runs)
-						const rawSlots = result["multi_ip_slots"] as string | undefined;
-						if (result[STORAGE_KEYS.ENABLED] && rawSlots) {
-							try {
-								const slots = JSON.parse(rawSlots) as PacSlot[];
-								if (slots.length > 0) {
-									resolve({ enabled: true, mode: "pac", config: null });
-									return;
-								}
-							} catch {
-								// fall through to fixed/direct check
-							}
-						}
-
 						// Check in-memory fixed config or storage fixed config
 						if (this.firefoxConfig) {
 							resolve({ enabled: true, mode: "fixed", config: this.firefoxConfig });
@@ -383,23 +311,13 @@ class ProxyManager {
 				"multi_ip_slots",
 			]);
 
-			// Try to restore multi-IP mode first
-			const rawSlots = result["multi_ip_slots"] as string | undefined;
-			if (result[STORAGE_KEYS.ENABLED] && rawSlots) {
-				try {
-					const slots = JSON.parse(rawSlots) as PacSlot[];
-					if (slots.length > 0) {
-						this.enableMultiIp(slots);
-						return;
-					}
-				} catch {
-					// Preserve the original record for retry or explicit repair. A
-					// malformed record or failed listener is not a user disconnect.
-					throw new Error("Failed to restore saved Firefox multi-IP proxy config");
-				}
+			// An older version's pool: its saved fixed config, if any, is stale, so
+			// nothing is restored, and the background replaces the pool with the
+			// install's one client (bridge/background.ts migrateLegacyMultiIp)
+			if (result["multi_ip_slots"] !== undefined) {
+				return;
 			}
 
-			// Fall back to restoring standard/fixed mode
 			const stored = result[STORAGE_KEYS.CONFIG] as ProxyConfig | undefined;
 			if (result[STORAGE_KEYS.ENABLED] && stored) {
 				try {

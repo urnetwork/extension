@@ -32,6 +32,18 @@ export type BridgeAuthClientResult = {
 	error?: BridgeAuthClientError | null;
 };
 
+// the server's own reason in an error body, if it gave one
+function bodyReason(body: unknown): string | null {
+	if (typeof body !== "object" || body === null) return null;
+	const error = (body as { error?: unknown }).error;
+	if (typeof error === "string" && error !== "") return error;
+	if (typeof error === "object" && error !== null) {
+		const message = (error as { message?: unknown }).message;
+		if (typeof message === "string" && message !== "") return message;
+	}
+	return null;
+}
+
 export async function authNetworkClient(
 	args: AuthNetworkClientArgs,
 	byJwt: string,
@@ -55,13 +67,17 @@ export async function authNetworkClient(
 		};
 	} catch (error) {
 		if (isURNetworkApiError(error) && error.kind === "http") {
+			// 402 is the plan-limit signal (see AuthNetworkClientError.UpgradeRequired):
+			// the server answers a refused proxy or client with its reason in the
+			// body ({error: "..."} from x402, or {error: {message}}), which the
+			// page shows as is
+			const planLimit = error.status === 402;
 			return {
 				proxy_config_result: null,
 				error: {
-					message: `HTTP error! status: ${error.status}`,
-					client_limit_exceeded: false,
-					// 402 is the plan-limit signal (see AuthNetworkClientError.UpgradeRequired)
-					upgrade_required: error.status === 402,
+					message: bodyReason(error.body) ?? `HTTP error! status: ${error.status}`,
+					client_limit_exceeded: planLimit,
+					upgrade_required: planLimit,
 				},
 			};
 		}
@@ -75,11 +91,20 @@ export async function authNetworkClient(
 	}
 }
 
-export async function removeNetworkClient(clientId: string, byJwt: string): Promise<void> {
-	// best effort — a failed remove leaves an inactive client that expires server-side
+// Never rejects. Resolves false when the release did not reach the server, or
+// met a server error, and is worth retrying: a client that is not removed
+// stays active until the server's idle reap (about 30 days after its last
+// use), counting against the network's cap of active proxies, so the caller
+// keeps it pending (utils/client-release.ts). A refusal (4xx, or a handled
+// error in the body) will not change on a retry and resolves true.
+export async function removeNetworkClient(clientId: string, byJwt: string): Promise<boolean> {
 	try {
 		await extensionApiClient().removeNetworkClient({ client_id: clientId }, { token: byJwt });
-	} catch {
-		// ignore
+		return true;
+	} catch (error) {
+		if (isURNetworkApiError(error) && error.kind === "http") {
+			return error.status < 500 && error.status !== 429;
+		}
+		return false;
 	}
 }

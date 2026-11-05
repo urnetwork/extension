@@ -1,9 +1,18 @@
-import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
-import { performHealthCheck } from "../utils/node-health-pass";
+import { proxyManager } from "../utils/proxy-manager";
+import { performHealthCheck } from "../utils/proxy-health";
 import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
 import { isAllowedOrigin } from "../utils/origins";
-import { initBridge, notifySessionChanged, handleExtensionLocationChange } from "../bridge/background";
+import {
+	connectFromPopup,
+	disconnectFromPopup,
+	endFromPopup,
+	handleExtensionLocationChange,
+	initBridge,
+	migrateLegacyMultiIp,
+	notifySessionChanged,
+} from "../bridge/background";
+import type { ConnectLocation } from "../utils/sdk-types";
 import { initDeviceRpcBridge } from "../bridge/device-rpc";
 import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
 import type { FirefoxGlobal } from "../types/firefox-webext";
@@ -40,7 +49,7 @@ if (!isFirefox() && chrome.proxy?.onProxyError) {
 // ── Health check system ───────────────────────────────────────────────────────
 
 function triggerEarlyHealthCheck(): void {
-	performHealthCheck().catch((err) => {
+	performHealthCheck(notifySessionChanged).catch((err) => {
 		console.error("Health check failed:", err);
 	});
 }
@@ -50,7 +59,7 @@ chrome.alarms.create(HEALTH_ALARM_NAME, { periodInMinutes: 1 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
 	if (alarm.name === HEALTH_ALARM_NAME) {
-		performHealthCheck().catch((err) => {
+		performHealthCheck(notifySessionChanged).catch((err) => {
 			console.error("Scheduled health check failed:", err);
 		});
 	}
@@ -58,18 +67,26 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 
+// Restore the saved proxy, then replace an older version's multi-IP pool with
+// the install's one client (bridge/background.ts migrateLegacyMultiIp).
+function restoreThenMigrate(): void {
+	proxyManager
+		.restoreState()
+		.catch((err) => {
+			console.error("Failed to restore proxy state on startup:", err);
+		})
+		.then(() => migrateLegacyMultiIp())
+		.catch((err) => {
+			console.error("Failed to replace the multi-IP pool:", err);
+		});
+}
+
 // Firefox: restore proxy listener immediately — no need to wait for Chrome's
 // proxy.settings.get() to settle. The 2-second delay only benefits Chrome.
 if ((globalThis as FirefoxGlobal).browser?.proxy?.onRequest) {
-	proxyManager.restoreState().catch((err) => {
-		console.error("Failed to restore Firefox proxy state on startup:", err);
-	});
+	restoreThenMigrate();
 } else {
-	setTimeout(() => {
-		proxyManager.restoreState().catch((err) => {
-			console.error("Failed to restore proxy state on startup:", err);
-		});
-	}, 2_000);
+	setTimeout(restoreThenMigrate, 2_000);
 }
 
 // ── SSO tab listener (legacy fallback for non-identity flows) ───────────────────
@@ -215,58 +232,36 @@ chrome.runtime.onMessageExternal.addListener(
 // ── Internal messages ─────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-	if (message.type === "ENABLE_VPN") {
-		if (!message.config) {
-			sendResponse({ success: false, error: "Missing proxy config" });
-			return false;
-		}
-
-		proxyManager
-			.enable(message.config as ProxyConfig)
-			.then(() => {
-				sendResponse({ success: true });
-				notifySessionChanged("connect");
-			})
+	// The popup's connection (utils/connection-manager.ts): the install's one
+	// client, owned here so a closed popup ends nothing (bridge/background.ts).
+	if (message.type === "POPUP_CONNECT") {
+		const location =
+			message.location && typeof message.location === "object"
+				? (message.location as ConnectLocation)
+				: undefined;
+		connectFromPopup(location)
+			.then((outcome) =>
+				sendResponse(
+					outcome.ok
+						? { success: true, session: outcome.session }
+						: { success: false, error: outcome.error, code: outcome.code },
+				),
+			)
 			.catch((err: Error) => {
-				console.error("Failed to enable VPN:", err);
+				console.error("Failed to connect:", err);
 				sendResponse({ success: false, error: err.message });
 			});
-
 		return true;
 	}
 
-	if (message.type === "DISABLE_VPN") {
-		proxyManager
-			.disable()
-			.then(() => {
-				sendResponse({ success: true });
-				notifySessionChanged("disconnect");
-			})
+	if (message.type === "POPUP_DISCONNECT" || message.type === "POPUP_END_SESSION") {
+		const end = message.type === "POPUP_END_SESSION";
+		(end ? endFromPopup() : disconnectFromPopup())
+			.then((session) => sendResponse({ success: true, session }))
 			.catch((err: Error) => {
-				console.error("Failed to disable VPN:", err);
+				console.error("Failed to disconnect:", err);
 				sendResponse({ success: false, error: err.message });
 			});
-
-		return true;
-	}
-
-	if (message.type === "SWAP_PROXY") {
-		if (!message.config) {
-			sendResponse({ success: false, error: "Missing proxy config" });
-			return false;
-		}
-
-		proxyManager
-			.swap(message.config as ProxyConfig)
-			.then(() => {
-				sendResponse({ success: true });
-				notifySessionChanged("renew");
-			})
-			.catch((err: Error) => {
-				console.error("Failed to swap proxy:", err);
-				sendResponse({ success: false, error: err.message });
-			});
-
 		return true;
 	}
 
@@ -282,64 +277,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 				sendResponse({ success: true, state: proxyManager.getState() });
 			});
 
-		return true;
-	}
-
-	if (message.type === "ENABLE_TAB_ISOLATION_PAC") {
-		if (!message.dataUrl) {
-			sendResponse({ success: false, error: "Missing PAC data URL" });
-			return false;
-		}
-
-		const pacConfig: chrome.proxy.ProxyConfig = {
-			mode: "pac_script",
-			pacScript: { url: message.dataUrl as string },
-		};
-
-		chrome.proxy.settings.set({ value: pacConfig, scope: "regular" }, () => {
-			if (chrome.runtime.lastError) {
-				sendResponse({ success: false, error: chrome.runtime.lastError.message });
-			} else {
-				sendResponse({ success: true });
-				notifySessionChanged("connect");
-			}
-		});
-
-		return true;
-	}
-
-	if (message.type === "DISABLE_TAB_ISOLATION_PAC") {
-		chrome.proxy.settings.set(
-			{ value: { mode: "direct" }, scope: "regular" },
-			() => {
-				const success = chrome.runtime.lastError == null;
-				sendResponse({ success });
-				if (success) notifySessionChanged("disconnect");
-			},
-		);
-		return true;
-	}
-
-	if (message.type === "ENABLE_FIREFOX_MULTI_IP") {
-		if (!message.slots || !Array.isArray(message.slots)) {
-			sendResponse({ success: false, error: "Missing proxy slots" });
-			return false;
-		}
-		try {
-			proxyManager.enableMultiIp(message.slots);
-			sendResponse({ success: true });
-			notifySessionChanged("connect");
-		} catch (err: unknown) {
-			const msg = err instanceof Error ? err.message : "Unknown error";
-			sendResponse({ success: false, error: msg });
-		}
-		return true;
-	}
-
-	if (message.type === "DISABLE_FIREFOX_MULTI_IP") {
-		proxyManager.disableMultiIp();
-		sendResponse({ success: true });
-		notifySessionChanged("disconnect");
 		return true;
 	}
 
@@ -362,8 +299,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 	}
 
 	// The popup changed the connect location. If an app tab is attached, the
-	// change is delegated to its DeviceRemote (device-rpc, no proxy reconnect);
-	// otherwise the popup falls back to a normal connect/swap. See bridge.ts.
+	// change is delegated to its DeviceRemote (device-rpc, no proxy reconnect,
+	// no new client); otherwise the popup connects at the location, which
+	// replaces the install's client. See bridge/background.ts.
 	if (message.type === "CHANGE_LOCATION") {
 		handleExtensionLocationChange(
 			typeof message.locationId === "string" ? message.locationId : null,

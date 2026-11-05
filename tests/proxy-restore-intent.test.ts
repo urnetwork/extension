@@ -86,44 +86,24 @@ describe("proxy restart preserves intended connection", () => {
 		expect(proxyManager.getState()).toEqual({ enabled: true, mode: "fixed", config: CONFIG });
 	});
 
-	it("keeps a malformed Firefox multi-IP record intact and does not silently fall back to fixed mode", async () => {
-		vi.resetModules();
-		const browser = installChromeMock();
-		const malformed = "{private-malformed-slot-record";
-		browser.seedStorage({ proxy_enabled: true, proxy_config: CONFIG, multi_ip_slots: malformed });
-		const firefox = installFirefox();
-		const { proxyManager } = await import("../src/utils/proxy-manager");
-		const error = await proxyManager.restoreState().then(() => null, (failure: unknown) => failure);
-		expect(browser.getStored("proxy_enabled"), "restore failure erased saved connect intent").toBe(true);
-		expect(browser.getStored("multi_ip_slots")).toBe(malformed);
-		expect(browser.getStored("proxy_config")).toEqual(CONFIG);
-		expect(error).toEqual(new Error("Failed to restore saved Firefox multi-IP proxy config"));
-		expect(firefox.listeners).toHaveLength(0);
-		expect(proxyManager.getState().enabled).toBe(false);
-	});
-
-	it("keeps Firefox multi-IP intent when listener installation fails and retries its slots", async () => {
-		vi.resetModules();
-		const browser = installChromeMock();
-		const slots = [{ host: CONFIG.host, port: CONFIG.port }];
-		const saved = JSON.stringify(slots);
-		browser.seedStorage({ proxy_enabled: true, multi_ip_slots: saved });
-		const firefox = installFirefox();
-		const install = vi.spyOn(firefox.onRequest, "addListener").mockImplementation(() => {
-			throw new Error("private-multi-listener-error");
-		});
-		const { proxyManager } = await import("../src/utils/proxy-manager");
-		const error = await proxyManager.restoreState().then(() => null, (failure: unknown) => failure);
-		expect(browser.getStored("proxy_enabled"), "restore failure erased saved connect intent").toBe(true);
-		expect(browser.getStored("multi_ip_slots")).toBe(saved);
-		expect(error).toEqual(new Error("Failed to restore saved Firefox multi-IP proxy config"));
-		expect(proxyManager.isListenerActive()).toBe(false);
-
-		install.mockRestore();
-		await proxyManager.restoreState();
-		expect(firefox.listeners).toHaveLength(1);
-		expect(proxyManager.getMultiIpSlots()).toEqual(slots);
-		expect(proxyManager.getState()).toEqual({ enabled: true, mode: "pac", config: null });
+	// An older version's Firefox pool: its fixed config, if one is left beside
+	// it, is stale, so nothing is restored and the record stays for the upgrade
+	// to replace with the install's one client (bridge/background.ts
+	// migrateLegacyMultiIp). A malformed record is kept as it is.
+	it("restores nothing from an older version's Firefox multi-IP record and keeps it", async () => {
+		for (const slots of ["{private-malformed-slot-record", JSON.stringify([{ host: CONFIG.host, port: CONFIG.port }])]) {
+			vi.resetModules();
+			const browser = installChromeMock();
+			browser.seedStorage({ proxy_enabled: true, proxy_config: CONFIG, multi_ip_slots: slots });
+			const firefox = installFirefox();
+			const { proxyManager } = await import("../src/utils/proxy-manager");
+			await proxyManager.restoreState();
+			expect(browser.getStored("proxy_enabled"), "restore erased saved connect intent").toBe(true);
+			expect(browser.getStored("multi_ip_slots")).toBe(slots);
+			expect(browser.getStored("proxy_config")).toEqual(CONFIG);
+			expect(firefox.listeners).toHaveLength(0);
+			expect(proxyManager.getState().enabled).toBe(false);
+		}
 	});
 
 	it("preserves explicit disconnect and does not restore either browser's saved configuration", async () => {

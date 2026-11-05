@@ -35,18 +35,6 @@ export function shouldBypass(hostname: string, extraHosts: readonly string[] = [
 	return false;
 }
 
-export function pacBypassConditions(extraHosts: readonly string[] = []): string {
-	const conditions = [
-		`if (host === "localhost" || host === "127.0.0.1" || isInNet(host, "127.0.0.0", "255.0.0.0")) return "DIRECT";`,
-		`if (host === "api.bringyour.com") return "DIRECT";`,
-	];
-	for (const host of extraHosts) {
-		conditions.push(`if (host === ${JSON.stringify(host)}) return "DIRECT";`);
-	}
-	conditions.push(`if (shExpMatch(host, "*.local")) return "DIRECT";`);
-	return conditions.join("\n  ");
-}
-
 const CHROME_BYPASS_BASE = ["localhost", "127.0.0.1", "<local>", "api.bringyour.com"];
 
 export function chromeBypassList(extraHosts: readonly string[] = []): string[] {
