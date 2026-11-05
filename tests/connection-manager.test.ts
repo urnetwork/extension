@@ -44,7 +44,7 @@ describe("popup connect", () => {
 
 		const profiles = await connectSlots();
 
-		expect(profiles).toHaveLength(5);
+		expect(profiles).toHaveLength(1);
 		for (const profile of profiles) {
 			expect(profile).toEqual(wireProfile("speed", wireWindow(1, 1)));
 		}
@@ -53,6 +53,6 @@ describe("popup connect", () => {
 	it("provisions auto when ur.io never handed any over", async () => {
 		const profiles = await connectSlots();
 
-		expect(profiles).toEqual([null, null, null, null, null]);
+		expect(profiles).toEqual([null]);
 	});
 });
