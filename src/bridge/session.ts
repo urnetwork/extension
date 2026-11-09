@@ -2,8 +2,9 @@
 // per extension). Provisioned on the first connect and kept: every later
 // connect, reconnect, reattach and service worker restart applies it again
 // with no auth-client call, and a disconnect only takes the proxy off. It is
-// replaced only by a location change with no ur.io tab to move the hosted
-// device, and removed when the extension's identity changes (setup, logout).
+// replaced by a location change with no ur.io tab to move the hosted device,
+// or when the server no longer has it after the health check gave up on it,
+// and removed when the extension's identity changes (setup, logout).
 // Device-rpc endpoint and credential fields are extension-private and must
 // never be returned to the ur.io page.
 export type BridgeSessionRecord = {
