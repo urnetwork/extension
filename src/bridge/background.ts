@@ -28,7 +28,12 @@
 // expiration). A connect at another location moves the hosted device when a
 // ur.io tab can (handleExtensionLocationChange); otherwise it provisions a new
 // client there, applies it, and removes the one it replaced before it answers,
-// so at most two exist for a moment. Setup and logout remove the client. Every
+// so at most two exist for a moment. When the network's proxy cap refuses that
+// second one, the install gives its client back first and creates the new one
+// in its slot (giveBackInstallClients). Setup and logout remove the client. The
+// server can remove the client too (ur.io's Proxies page, a trim, the idle
+// reap): once the health check gives up on it, the next connect asks the server
+// whether it still has it and provisions anew if not (savedClientRemoved). Every
 // client the extension stops using is released through utils/client-release.ts,
 // which keeps a failed release for a later pass: a client that is not removed
 // stays active on the server until its idle reap (about 30 days after its last
@@ -60,7 +65,7 @@
 import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
 import { chromeStorageAdapter } from "../utils/storage-adapter";
 import { BRIDGE_PORT_NAME, type PortRequestFrame } from "./protocol";
-import { authNetworkClient, removeNetworkClient } from "./api";
+import { activeProxyClientIds, authNetworkClient, removeNetworkClient } from "./api";
 import { buildAuthParams } from "../utils/auth-params";
 import { parseJwtClaims } from "../utils/jwt-claims";
 import {
@@ -94,7 +99,7 @@ import {
 	connectLocationPageId,
 	locationIdKey,
 } from "../utils/connect-location-key";
-import { clearProxyHealth } from "../utils/proxy-health";
+import { clearFailedClient, clearProxyHealth, failedClientId } from "../utils/proxy-health";
 import { closeAllDeviceRpcConnections } from "./device-rpc";
 
 // An older version's session renewal alarm. Nothing renews now: an alarm left
@@ -303,11 +308,30 @@ async function connectInternal(location: ConnectLocation | undefined): Promise<C
 	if (
 		record &&
 		(!record.networkId || record.networkId === networkId) &&
-		recordLocationKey(record) === connectLocationKey(location)
+		recordLocationKey(record) === connectLocationKey(location) &&
+		!(await savedClientRemoved(record, jwt))
 	) {
 		return applySavedClient(record, jwt, networkId);
 	}
 	return provisionClient(location, jwt, networkId);
+}
+
+// Whether the server removed the saved client. The server can remove a client
+// the install still holds (ur.io's Proxies page, a trim, the idle reap after 30
+// days), and the proxy then refuses every request through it, so applying it
+// again only fails the health check again. It is asked only once the health
+// check gave up on the client (utils/proxy-health.ts), since the answer walks
+// the network's active clients. A list that does not come back keeps the client
+// and asks again on the next connect; a list that has it ends the question.
+async function savedClientRemoved(record: BridgeSessionRecord, jwt: string): Promise<boolean> {
+	if (!record.clientId || (await failedClientId()) !== record.clientId) return false;
+	const activeClientIds = await activeProxyClientIds(jwt);
+	if (activeClientIds === null) return false;
+	if (activeClientIds.has(record.clientId)) {
+		await clearFailedClient();
+		return false;
+	}
+	return true;
 }
 
 // The saved client, applied again: nothing is provisioned.
@@ -333,17 +357,29 @@ async function applySavedClient(
 }
 
 // A new client at `location`, applied, and then the client it replaces
-// removed: the first connect, another network's saved client, or a location
-// no ur.io tab could move the hosted device to.
+// removed: the first connect, another network's saved client, a saved client
+// the server removed, or a location no ur.io tab could move the hosted device
+// to. At the plan's proxy cap the new client is refused while the network
+// still holds the one it replaces; the install then gives its client back and
+// creates the new one in that slot (giveBackInstallClients), since it keeps one.
 async function provisionClient(
 	location: ConnectLocation | undefined,
 	jwt: string,
 	networkId: string | null,
 ): Promise<ConnectOutcome> {
-	const result = await authNetworkClient(
-		buildAuthParams(location, await loadPerformanceProfile()),
-		jwt,
-	);
+	const authParams = buildAuthParams(location, await loadPerformanceProfile());
+	let result = await authNetworkClient(authParams, jwt);
+	const gaveBack =
+		Boolean(result.error?.client_limit_exceeded) && (await giveBackInstallClients(jwt, networkId));
+	if (gaveBack) {
+		result = await authNetworkClient(authParams, jwt);
+	}
+	// the replacement did not happen after the install gave its clients back
+	const replacementFailed = async () => {
+		if (gaveBack) {
+			await leaveGivenBackProxy();
+		}
+	};
 
 	const claims = result.by_client_jwt ? parseJwtClaims(result.by_client_jwt) : null;
 	const newClientId = typeof claims?.client_id === "string" ? claims.client_id : null;
@@ -368,6 +404,7 @@ async function provisionClient(
 				? "client_limit"
 				: undefined;
 		await releaseNewClient();
+		await replacementFailed();
 		return { ok: false, error: result.error.message, code };
 	}
 
@@ -381,6 +418,7 @@ async function provisionClient(
 		(!pr.api_base_url && !pr.api_port)
 	) {
 		await releaseNewClient();
+		await replacementFailed();
 		return {
 			ok: false,
 			error: "Incomplete proxy configuration received",
@@ -396,6 +434,7 @@ async function provisionClient(
 		});
 	} catch (err) {
 		await releaseNewClient();
+		await replacementFailed();
 		throw err;
 	}
 
@@ -424,6 +463,7 @@ async function provisionClient(
 		await removePendingReleaseClients([newClientId]);
 	}
 	await clearProxyHealth();
+	await clearFailedClient();
 	// The client this one replaced, and an older version's pool, are over:
 	// removed before this answers, so the network holds two clients only for
 	// this moment. A failed release stays pending for a later pass.
@@ -437,6 +477,55 @@ async function provisionClient(
 	const session = await getSessionInfo();
 	broadcast("SESSION_CHANGED", { session, reason: "connect" });
 	return { ok: true, session };
+}
+
+// Gives back the install's own clients, the saved client and an older
+// version's pool, so that a replacement the plan's proxy cap refused can take
+// their slot: the clients are released, staying pending if a release fails,
+// and the saved record goes. The browser's proxy setting is left as it is, so
+// a connected browser never goes direct here: its requests fail until the
+// replacement is applied over it. An older version's pool of 5 fills the free
+// plan's cap by itself, so without this its upgrade could never connect. A
+// first connect at the cap, or a saved client of another network, gives
+// nothing back and keeps the refusal. Returns whether any client was given
+// back.
+//
+// The cap and the create rate refuse alike (client_limit_exceeded), so a
+// replacement the rate refused gives the client back too, and its retry is
+// refused again: the browser is left off the proxy (leaveGivenBackProxy) with
+// the server's "try again in a minute".
+async function giveBackInstallClients(jwt: string, networkId: string | null): Promise<boolean> {
+	const record = await loadBridgeSession();
+	if (record?.networkId && record.networkId !== networkId) {
+		return false;
+	}
+	const clientIds = await liveClientIds();
+	if (clientIds.length === 0) {
+		return false;
+	}
+	await addPendingReleaseClients(clientIds);
+	closeAllDeviceRpcConnections("device session replaced");
+	await clearBridgeSession();
+	await chromeStorageAdapter.removeItem(STORAGE_KEY_CLIENT_ID);
+	await chromeStorageAdapter.removeItem(STORAGE_KEY_MULTI_CLIENT_IDS);
+	await chrome.storage.local.remove(MULTI_IP_SLOTS_KEY);
+	await releaseBridgeClients([], [], jwt);
+	return true;
+}
+
+// The replacement failed after the install gave its clients back, so the
+// browser may still point at a client that is gone. It is taken off, unless
+// the kill switch keeps the browser off the internet until a connect succeeds.
+async function leaveGivenBackProxy(): Promise<void> {
+	if (!(await getKillSwitch())) {
+		try {
+			await proxyManager.disable();
+		} catch {
+			// the next connect or the health check takes it off
+		}
+	}
+	await clearProxyHealth();
+	broadcast("SESSION_CHANGED", { session: await getSessionInfo(), reason: "disconnect" });
 }
 
 // Takes the proxy off. The install's client stays saved for the next connect.
@@ -479,6 +568,7 @@ async function endInternal(reason: string, jwtOverride?: string | null): Promise
 	);
 	await clearBridgeSession();
 	await chromeStorageAdapter.removeItem(STORAGE_KEY_CLIENT_ID);
+	await clearFailedClient();
 
 	const session = await disconnectInternal(reason, jwt);
 	await releaseBridgeClients([], [], jwt);

@@ -148,6 +148,7 @@ export type BridgeHarness = {
 	api: {
 		authNetworkClient: ReturnType<typeof vi.fn>;
 		removeNetworkClient: ReturnType<typeof vi.fn>;
+		activeProxyClientIds: ReturnType<typeof vi.fn>;
 	};
 	/** attach a page port through the service's real onConnect listener;
 	 * pass url: null for a port whose sender has no url at all */
@@ -176,9 +177,12 @@ export async function createBridgeHarness(): Promise<BridgeHarness> {
 		}),
 	);
 	const removeNetworkClient = vi.fn(async (): Promise<unknown> => ({}));
+	// the network's proxy list did not come back, unless a test says what it holds
+	const activeProxyClientIds = vi.fn(async (): Promise<Set<string> | null> => null);
 	vi.doMock("../../src/bridge/api", () => ({
 		authNetworkClient,
 		removeNetworkClient,
+		activeProxyClientIds,
 	}));
 
 	const bridge = await import("../../src/bridge/background");
@@ -187,7 +191,7 @@ export async function createBridgeHarness(): Promise<BridgeHarness> {
 	return {
 		chrome: chromeMock,
 		bridge,
-		api: { authNetworkClient, removeNetworkClient },
+		api: { authNetworkClient, removeNetworkClient, activeProxyClientIds },
 		connect: (url = "https://ur.io/app", name = BRIDGE_PORT_NAME) => {
 			const fake = createFakePort(url ?? undefined, name);
 			for (const listener of chromeMock.onConnectListeners) {

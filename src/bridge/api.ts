@@ -67,10 +67,12 @@ export async function authNetworkClient(
 		};
 	} catch (error) {
 		if (isURNetworkApiError(error) && error.kind === "http") {
-			// 402 is the plan-limit signal (see AuthNetworkClientError.UpgradeRequired):
-			// the server answers a refused proxy or client with its reason in the
-			// body ({error: "..."} from x402, or {error: {message}}), which the
-			// page shows as is
+			// 402 is the plan-limit signal (see AuthNetworkClientError.UpgradeRequired)
+			// from servers before 2026-11-10, which quoted x402 terms to every caller
+			// that named no app; a server now quotes only a caller that asks
+			// (X-UR-X402: 1, never sent here) and answers the extension 200 with the
+			// refusal. Either way the reason is in the body ({error: "..."} from
+			// x402, or {error: {message}}), which the page shows as is
 			const planLimit = error.status === 402;
 			return {
 				proxy_config_result: null,
@@ -88,6 +90,25 @@ export async function authNetworkClient(
 				client_limit_exceeded: false,
 			},
 		};
+	}
+}
+
+// The ids of the network's active hosted proxies (GET /network/proxies), or
+// null when the list did not come back. Asked only after the health check gave
+// up on the install's client, to tell a client the server removed from one it
+// still has: the list walks the network's active clients, so it is not read on
+// every connect.
+export async function activeProxyClientIds(byJwt: string): Promise<Set<string> | null> {
+	try {
+		const result = await extensionApiClient().networkProxies({ token: byJwt });
+		if (!Array.isArray(result?.clients)) return null;
+		return new Set(
+			result.clients
+				.map((client) => client.client_id)
+				.filter((clientId): clientId is string => typeof clientId === "string" && clientId !== ""),
+		);
+	} catch {
+		return null;
 	}
 }
 

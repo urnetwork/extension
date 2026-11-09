@@ -43,6 +43,12 @@ export function defaultProxyHealthSettings(): ProxyHealthSettings {
 export const STORAGE_KEY_PROXY_HEALTH_FAILURES = "proxy_health_failures";
 // when the extension last took the proxy off for a failing health check
 export const STORAGE_KEY_PROXY_FALLBACK_AT = "proxy_fallback_at";
+// the install's client (bridge/background.ts) that the checks last gave up on:
+// taken off, or kept set by the kill switch. A connect asks the server whether
+// it still has that client before it applies it again. A disconnect keeps it.
+export const STORAGE_KEY_PROXY_FAILED_CLIENT_ID = "proxy_failed_client_id";
+// the install's applied client (bridge/background.ts STORAGE_KEY_CLIENT_ID)
+const STORAGE_KEY_CLIENT_ID = "proxy_client_id";
 
 // What a run found: no proxy of ours to check, a healthy proxy, a failure
 // that has not reached the threshold, a failing proxy kept set by the kill
@@ -62,6 +68,29 @@ async function loadFailures(): Promise<number> {
 /** Starts the failure count afresh and ends a fallback (a connect or disconnect). */
 export async function clearProxyHealth(): Promise<void> {
 	await chrome.storage.local.remove([STORAGE_KEY_PROXY_HEALTH_FAILURES, STORAGE_KEY_PROXY_FALLBACK_AT]);
+}
+
+/** The client the checks last gave up on, if any. */
+export async function failedClientId(): Promise<string | null> {
+	const result = await chrome.storage.local.get(STORAGE_KEY_PROXY_FAILED_CLIENT_ID);
+	const value = result[STORAGE_KEY_PROXY_FAILED_CLIENT_ID];
+	return typeof value === "string" && value !== "" ? value : null;
+}
+
+/** Forgets the failed client: it was replaced, removed, or the server still has it. */
+export async function clearFailedClient(): Promise<void> {
+	await chrome.storage.local.remove(STORAGE_KEY_PROXY_FAILED_CLIENT_ID);
+}
+
+// Writes down the applied client as the one the checks gave up on. The server
+// may have removed it (ur.io's Proxies page, a trim, the idle reap), and then
+// every connect that applied it again went through a proxy that refuses it.
+async function markClientFailed(): Promise<void> {
+	const result = await chrome.storage.local.get(STORAGE_KEY_CLIENT_ID);
+	const clientId = result[STORAGE_KEY_CLIENT_ID];
+	if (typeof clientId === "string" && clientId !== "") {
+		await chrome.storage.local.set({ [STORAGE_KEY_PROXY_FAILED_CLIENT_ID]: clientId });
+	}
 }
 
 async function probe(settings: ProxyHealthSettings): Promise<boolean> {
@@ -120,6 +149,7 @@ export async function performHealthCheck(
 		return "failing";
 	}
 
+	await markClientFailed();
 	if (await getKillSwitch()) {
 		// fail closed: the proxy stays set
 		tellPopup("unreachable");
