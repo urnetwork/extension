@@ -15,9 +15,11 @@
 // only a kill switch that is on sees the failures.
 //
 // The failure count lives in storage because the service worker can stop
-// between two runs.
+// between two runs. So does what a run last told the popup
+// (utils/proxy-health-report.ts), for a popup that opens after it.
 import { proxyManager } from "./proxy-manager";
 import { getKillSwitch } from "./kill-switch";
+import { STORAGE_KEY_PROXY_HEALTH_REPORT, type ProxyHealthReport } from "./proxy-health-report";
 import type { FirefoxGlobal } from "../types/firefox-webext";
 
 export type ProxyHealthSettings = {
@@ -65,9 +67,16 @@ async function loadFailures(): Promise<number> {
 	return typeof value === "number" && 0 < value ? value : 0;
 }
 
-/** Starts the failure count afresh and ends a fallback (a connect or disconnect). */
+/**
+ * Starts the failure count afresh and ends a fallback, and the report a popup
+ * would open to (a connect or disconnect).
+ */
 export async function clearProxyHealth(): Promise<void> {
-	await chrome.storage.local.remove([STORAGE_KEY_PROXY_HEALTH_FAILURES, STORAGE_KEY_PROXY_FALLBACK_AT]);
+	await chrome.storage.local.remove([
+		STORAGE_KEY_PROXY_HEALTH_FAILURES,
+		STORAGE_KEY_PROXY_FALLBACK_AT,
+		STORAGE_KEY_PROXY_HEALTH_REPORT,
+	]);
 }
 
 /** The client the checks last gave up on, if any. */
@@ -111,6 +120,12 @@ function tellPopup(outcome: ProxyHealthOutcome): void {
 	chrome.runtime.sendMessage({ type: "PROXY_HEALTH", outcome }).catch(() => {});
 }
 
+// keeps a failure report for a popup that opens later, then tells an open one
+async function reportFailure(report: ProxyHealthReport): Promise<void> {
+	await chrome.storage.local.set({ [STORAGE_KEY_PROXY_HEALTH_REPORT]: report });
+	tellPopup(report);
+}
+
 /**
  * One run of the check. `notify` is told when the proxy is taken off, so the
  * page's session snapshot follows (bridge/background.ts notifySessionChanged).
@@ -137,7 +152,11 @@ export async function performHealthCheck(
 	const failuresBefore = await loadFailures();
 	if (await probe(settings)) {
 		if (0 < failuresBefore) {
-			await chrome.storage.local.remove(STORAGE_KEY_PROXY_HEALTH_FAILURES);
+			// a report is only ever kept after failures, so this ends it too
+			await chrome.storage.local.remove([
+				STORAGE_KEY_PROXY_HEALTH_FAILURES,
+				STORAGE_KEY_PROXY_HEALTH_REPORT,
+			]);
 			tellPopup("healthy");
 		}
 		return "healthy";
@@ -152,7 +171,7 @@ export async function performHealthCheck(
 	await markClientFailed();
 	if (await getKillSwitch()) {
 		// fail closed: the proxy stays set
-		tellPopup("unreachable");
+		await reportFailure("unreachable");
 		return "unreachable";
 	}
 
@@ -162,6 +181,6 @@ export async function performHealthCheck(
 	await chrome.storage.local.remove(STORAGE_KEY_PROXY_HEALTH_FAILURES);
 	await chrome.storage.local.set({ [STORAGE_KEY_PROXY_FALLBACK_AT]: Date.now() });
 	notify("health");
-	tellPopup("fell_back");
+	await reportFailure("fell_back");
 	return "fell_back";
 }
