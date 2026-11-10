@@ -9,7 +9,8 @@ interface UseConnectionManagerResult {
 	disconnect: () => Promise<void>;
 	// logout: also removes the install's hosted proxy client
 	endSession: () => Promise<void>;
-	reattach: () => void;
+	// the popup opened: `proxyEnabled` is whether the browser is set to the proxy
+	reattach: (proxyEnabled: boolean) => Promise<void>;
 	onProxyChange: (cb: (config: null) => void) => void;
 }
 
@@ -60,7 +61,10 @@ export function useConnectionManager(): UseConnectionManagerResult {
 		await mgr.endSession();
 	}, [getManager]);
 
-	const reattach = useCallback(() => getManager().reattach(), [getManager]);
+	const reattach = useCallback(
+		(proxyEnabled: boolean) => getManager().reattach(proxyEnabled),
+		[getManager],
+	);
 
 	const onProxyChange = useCallback(
 		(cb: (config: null) => void) => {

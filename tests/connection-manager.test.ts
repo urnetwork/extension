@@ -5,7 +5,13 @@
 // with the kept connect options, since no ur.io tab is attached to a popup
 // connect; every later connect, and a reattach, provisions nothing. Wired here
 // to the bridge's popup entry points, as background/index.ts relays them.
-import { beforeEach, describe, expect, it } from "vitest";
+//
+// A popup that opens (reattach) shows what the health check last reported, as
+// a popup open all along does. It used to show Connected over any proxy that
+// was set, so a popup opened while the kill switch held a proxy that did not
+// answer said Connected until the next check (up to a minute and 8 s later),
+// and one opened after the checks took the proxy off never said why.
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createBridgeHarness, makeJwt, NETWORK_ID, type BridgeHarness } from "./bridge/harness";
 import { ConnectionManager, type ConnectionStatus } from "../src/utils/connection-manager";
 import { parsePerformanceProfile, storePerformanceProfile } from "../src/utils/performance-profile";
@@ -15,6 +21,11 @@ import { FIXED_IP_STREAMING, wireProfile, wireWindow } from "./performance-profi
 const JWT = makeJwt({ network_id: NETWORK_ID, network_name: "testnet", user_id: "user-1" });
 const LIMIT_MESSAGE =
 	"Your plan's limit of 5 active proxies is reached. Remove a proxy to create another, or upgrade to UR Pro for more.";
+// utils/connection-manager.ts, quoted in ur.io's browser tour
+const UNREACHABLE_MESSAGE =
+	"The proxy is not answering. The kill switch keeps the browser offline until it does.";
+const FELL_BACK_MESSAGE =
+	"The proxy stopped answering, so the browser went back to a direct connection. Connect to try again.";
 
 function clientId(n: number): string {
 	return `00000000-0000-4000-8000-${n.toString(16).padStart(12, "0")}`;
@@ -107,7 +118,7 @@ describe("popup connection manager", () => {
 		const second = popupManager();
 		await second.manager.connect(location1);
 		const reopened = popupManager();
-		reopened.manager.reattach();
+		await reopened.manager.reattach(true);
 
 		expect(second.manager.getStatus()).toBe("connected");
 		expect(reopened.manager.getStatus()).toBe("connected");
@@ -162,6 +173,109 @@ describe("popup connection manager", () => {
 		deliver("fell_back");
 		expect(popup.manager.getStatus()).toBe("error");
 		expect(popup.errors.at(-1)).toMatch(/direct connection/);
+	});
+
+	describe("a popup that opens shows what the health check last reported", () => {
+		let health: typeof import("../src/utils/proxy-health");
+
+		beforeEach(async () => {
+			// the same module registry as the bridge the harness loaded
+			health = await import("../src/utils/proxy-health");
+		});
+
+		// tests/setup.ts fails every fetch: the proxy does not answer
+		async function failChecks(n: number) {
+			for (let i = 0; i < n; i++) await health.performHealthCheck();
+		}
+
+		function deliver(outcome: string) {
+			for (const listener of [...h.chrome.onMessageListeners]) {
+				listener({ type: "PROXY_HEALTH", outcome });
+			}
+		}
+
+		it("during an outage the kill switch holds: why, not Connected", async () => {
+			h.chrome.seedStorage({ kill_switch_enabled: true });
+			await popupManager().manager.connect(location1);
+			await failChecks(3);
+			expect(h.chrome.proxyValue()).toMatchObject({ mode: "fixed_servers" });
+
+			// the popup closes, and opens again over the proxy that is still set
+			const reopened = popupManager();
+			await reopened.manager.reattach(true);
+
+			expect(reopened.manager.getStatus()).toBe("degraded");
+			expect(reopened.errors.at(-1)).toBe(UNREACHABLE_MESSAGE);
+			expect(reopened.sent).toEqual([]);
+		});
+
+		it("after the checks took the proxy off: why", async () => {
+			await popupManager().manager.connect(location1);
+			await failChecks(3);
+			expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+
+			const reopened = popupManager();
+			await reopened.manager.reattach(false);
+
+			expect(reopened.manager.getStatus()).toBe("error");
+			expect(reopened.errors.at(-1)).toBe(FELL_BACK_MESSAGE);
+		});
+
+		it("before the third failure, as an open popup: Connected", async () => {
+			h.chrome.seedStorage({ kill_switch_enabled: true });
+			await popupManager().manager.connect(location1);
+			await failChecks(2);
+
+			const reopened = popupManager();
+			await reopened.manager.reattach(true);
+
+			expect(reopened.manager.getStatus()).toBe("connected");
+		});
+
+		it("a passing check, a connect or a disconnect ends the report", async () => {
+			h.chrome.seedStorage({ kill_switch_enabled: true });
+			const popup = popupManager();
+			await popup.manager.connect(location1);
+
+			await failChecks(3);
+			vi.stubGlobal("fetch", async () => ({ ok: true }));
+			expect(await health.performHealthCheck()).toBe("healthy");
+			const afterPass = popupManager();
+			await afterPass.manager.reattach(true);
+			expect(afterPass.manager.getStatus()).toBe("connected");
+
+			vi.stubGlobal("fetch", async () => {
+				throw new Error("unreachable");
+			});
+			await failChecks(3);
+			// applies the saved client again, starting the count afresh
+			await popup.manager.connect(location1);
+			const afterConnect = popupManager();
+			await afterConnect.manager.reattach(true);
+			expect(afterConnect.manager.getStatus()).toBe("connected");
+
+			await failChecks(3);
+			await popup.manager.disconnect();
+			const afterDisconnect = popupManager();
+			await afterDisconnect.manager.reattach(false);
+			expect(afterDisconnect.manager.getStatus()).toBe("idle");
+			expect(afterDisconnect.errors).toEqual([]);
+		});
+
+		it("a report that arrives while the popup reads the kept one is newer, and wins", async () => {
+			h.chrome.seedStorage({ kill_switch_enabled: true });
+			await popupManager().manager.connect(location1);
+			await failChecks(3);
+
+			const reopened = popupManager();
+			const opening = reopened.manager.reattach(true);
+			// the next check passes while the kept report is still being read
+			deliver("healthy");
+			await opening;
+
+			expect(reopened.manager.getStatus()).toBe("connected");
+			expect(reopened.errors.at(-1)).toBeNull();
+		});
 	});
 
 	it("logout ends the client, and a disconnected manager stops listening", async () => {

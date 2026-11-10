@@ -16,7 +16,8 @@
 //   • storage.onChanged listeners are registered but never fired: tests drive
 //     the bridge through its port protocol only, and firing change events
 //     would make assertion ordering nondeterministic. (Code under test must
-//     not RELY on the mock firing them.)
+//     not RELY on the mock firing them; a test that is about a change
+//     delivers it to onStorageChangedListeners by hand.)
 //
 // Install with installChromeMock(); each test gets a fresh instance.
 
@@ -123,6 +124,10 @@ export function installChromeMock(): ChromeMock {
 			onChanged: {
 				addListener: (listener: StorageChangeListener) => {
 					onStorageChangedListeners.push(listener);
+				},
+				removeListener: (listener: StorageChangeListener) => {
+					const index = onStorageChangedListeners.indexOf(listener);
+					if (0 <= index) onStorageChangedListeners.splice(index, 1);
 				},
 			},
 		},

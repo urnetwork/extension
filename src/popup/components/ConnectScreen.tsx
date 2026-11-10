@@ -27,6 +27,7 @@ import {
 	getGeoSyncPosition,
 	setGeoSyncEnabled as persistGeoSyncEnabled,
 } from "@/utils/geo-sync";
+import { watchKillSwitch } from "@/utils/kill-switch";
 import {
 	STORAGE_KEY_GEO_ENABLED,
 	STORAGE_KEY_GEO_POSITION,
@@ -77,25 +78,24 @@ export const ConnectScreen: React.FC = () => {
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
 	const ipFailCountRef = useRef(0);
 	const [proxyActiveButUnreachable, setProxyActiveButUnreachable] = useState(false);
-	const [killSwitch, setKillSwitchLocal] = useState(true);
+	// the stored kill switch, null until it is read: the toggle shows neither
+	// state before then (it is off unless the user turned it on)
+	const [killSwitch, setKillSwitchLocal] = useState<boolean | null>(null);
 
-	useEffect(() => {
-		chrome.runtime.sendMessage({ type: "GET_KILL_SWITCH" }).then((res) => {
-			if (res?.success) setKillSwitchLocal(res.enabled);
-		});
-	}, []);
+	useEffect(() => watchKillSwitch(setKillSwitchLocal), []);
 
 	const handleKillSwitchToggle = useCallback(() => {
+		if (killSwitch === null) return;
 		const next = !killSwitch;
 		setKillSwitchLocal(next);
-		chrome.runtime.sendMessage({ type: "SET_KILL_SWITCH", enabled: next });
+		chrome.runtime.sendMessage({ type: "SET_KILL_SWITCH", enabled: next }).catch(() => {});
 	}, [killSwitch]);
 
 	// ── location sync (geolocation override) ─────────────────────────────────
 	// Opt-in, off by default. Both pieces of state live in chrome.storage.local
 	// so the content scripts read them directly (see content/geo-config.ts) —
-	// this screen only mirrors them.
-	const [geoSync, setGeoSync] = useState(false);
+	// this screen only mirrors them. Like the kill switch, null until read.
+	const [geoSync, setGeoSync] = useState<boolean | null>(null);
 	const [geoPosition, setGeoPosition] = useState<GeoSyncPosition | null>(null);
 
 	useEffect(() => {
@@ -126,6 +126,7 @@ export const ConnectScreen: React.FC = () => {
 	}, []);
 
 	const handleGeoSyncToggle = useCallback(() => {
+		if (geoSync === null) return;
 		const next = !geoSync;
 		setGeoSync(next);
 		if (!next) setGeoPosition(null);
@@ -150,7 +151,7 @@ export const ConnectScreen: React.FC = () => {
 			const info = await fetchIpInfo();
 			setIpInfo(info);
 			setIpInfoError(false);
-			const currentlyActive = statusRef.current === "connected" || statusRef.current === "reconnecting" || statusRef.current === "degraded";
+			const currentlyActive = statusRef.current === "connected" || statusRef.current === "degraded";
 			if (currentlyActive && info.connectedToNetwork) {
 				ipFailCountRef.current = 0;
 				setProxyActiveButUnreachable(false);
@@ -211,9 +212,9 @@ export const ConnectScreen: React.FC = () => {
 						await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
 					}
 				}
-				if (vpnResponse?.success && vpnResponse.state?.enabled) {
-					reattach();
-				}
+				if (cancelled) return;
+				// shows what the health check last reported, not a fresh Connected
+				await reattach(Boolean(vpnResponse?.success && vpnResponse.state?.enabled));
 			} catch (err) {
 				if (!cancelled) console.error("Failed to load initial state:", err);
 			}
@@ -268,10 +269,7 @@ export const ConnectScreen: React.FC = () => {
 				await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
 			}
 
-			const isConnected =
-				status === "connected" ||
-				status === "reconnecting" ||
-				status === "degraded";
+			const isConnected = status === "connected" || status === "degraded";
 
 			if (isConnected) {
 				try {
@@ -345,7 +343,9 @@ export const ConnectScreen: React.FC = () => {
 
 	const isActive = status === "connected";
 	const isConnecting = status === "connecting";
-	const isReconnecting = status === "reconnecting" || status === "degraded";
+	// the kill switch keeps a proxy that does not answer; nothing reconnects
+	// (utils/proxy-health.ts), so the popup says why the browser is offline
+	const isDegraded = status === "degraded";
 
 	// The note under the location sync toggle: the resting line describes the
 	// rule (oldest connected provider = the most stable one), and the two live
@@ -402,19 +402,9 @@ export const ConnectScreen: React.FC = () => {
 					</div>
 				</div>
 
-				{/* Reconnecting notice */}
-				{isReconnecting && (
-					<div className="flex items-center gap-2 px-4 mb-2">
-						<UrIconSpinner size={0.65} />
-						<span className="text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
-							Reconnecting...
-						</span>
-					</div>
-				)}
-
 				{/* Connect / Disconnect button */}
 				<div className="px-4 mb-4">
-					{isActive || isReconnecting || isConnecting ? (
+					{isActive || isDegraded || isConnecting ? (
 						<UrButton onClick={handleDisconnect} loading={false} disabled={false} variant="secondary" fullWidth>
 							<UrText>{getMessage("disconnect")}</UrText>
 						</UrButton>
@@ -424,7 +414,13 @@ export const ConnectScreen: React.FC = () => {
 						</UrButton>
 					)}
 
-					{proxyActiveButUnreachable && !isReconnecting && (
+					{isDegraded && connectionError && (
+						<p className="mt-2 text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
+							{connectionError}
+						</p>
+					)}
+
+					{proxyActiveButUnreachable && !isDegraded && (
 						<p className="mt-2 text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
 							Proxy active but network unreachable.
 						</p>
@@ -450,7 +446,11 @@ export const ConnectScreen: React.FC = () => {
 							<div className="flex flex-col gap-0.5 flex-1 min-w-0">
 								<span className="text-xs font-medium">Kill Switch</span>
 								<span className="text-[10px] opacity-50 leading-tight">
-									{killSwitch ? "Blocks traffic on failure" : "Traffic may leak on failure"}
+									{killSwitch === null
+										? "\u00a0"
+										: killSwitch
+											? "Blocks traffic on failure"
+											: "Traffic may leak on failure"}
 								</span>
 							</div>
 							<ToggleSwitch enabled={killSwitch} onToggle={handleKillSwitchToggle} label="Toggle kill switch" />
@@ -490,13 +490,19 @@ export const ConnectScreen: React.FC = () => {
 							style={{
 								backgroundColor: isActive
 									? "var(--ur-color-green, #22c55e)"
-									: isConnecting || isReconnecting
+									: isConnecting || isDegraded
 										? "var(--ur-color-yellow-light, #fbbf24)"
 										: "var(--ur-color-gray, #6b7280)",
 							}}
 						/>
 						<span className="text-[11px] opacity-60">
-							{isActive ? "Connected" : isConnecting ? "Connecting..." : isReconnecting ? "Reconnecting..." : "Disconnected"}
+							{isActive
+								? "Connected"
+								: isConnecting
+									? "Connecting..."
+									: isDegraded
+										? "Proxy not answering"
+										: "Disconnected"}
 						</span>
 					</div>
 				</div>
@@ -702,26 +708,33 @@ const RegionGroupedList: React.FC<{
 	</div>
 );
 
+// `enabled` is null until the stored setting is read: the switch is then a
+// dimmed track with no knob, neither on nor off, and does nothing.
 const ToggleSwitch: React.FC<{
-	enabled: boolean;
+	enabled: boolean | null;
 	onToggle: () => void;
 	disabled?: boolean;
 	label: string;
 }> = ({ enabled, onToggle, disabled, label }) => (
 	<button
 		type="button"
+		role={enabled === null ? undefined : "switch"}
+		aria-checked={enabled === null ? undefined : enabled}
+		aria-busy={enabled === null ? true : undefined}
 		onClick={onToggle}
-		disabled={disabled}
+		disabled={disabled || enabled === null}
 		aria-label={label}
 		className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
 		style={{
 			backgroundColor: enabled ? "var(--ur-color-green, #22c55e)" : "var(--color-surface-3, #3f3f46)",
 		}}
 	>
-		<span
-			className="pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition duration-200 ease-in-out"
-			style={{ transform: enabled ? "translateX(16px)" : "translateX(0)" }}
-		/>
+		{enabled !== null && (
+			<span
+				className="pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow transform transition duration-200 ease-in-out"
+				style={{ transform: enabled ? "translateX(16px)" : "translateX(0)" }}
+			/>
+		)}
 	</button>
 );
 
