@@ -41,10 +41,15 @@ export default defineManifest({
 			service_worker: "src/background/index.ts",
 			type: "module",
 		},
+	// An update that adds a required permission with a warning (notifications
+	// has one) is disabled by the browser until the user accepts it, and the
+	// extension's proxy setting goes with it.
 	permissions: ["proxy", "storage", "alarms", "tabs", "identity"],
-	// The out-of-data notification (utils/out-of-balance.ts) is posted only
-	// where the browser already allows it: optional, so an update asks nothing
-	// and keeps the extension enabled, and the extension never requests it.
+	// The out-of-data notification (utils/out-of-balance.ts): optional, so an
+	// update asks nothing and keeps the extension enabled. Only the popup's Turn
+	// on alerts asks for it, on the user's click (owner, 2026-11-11;
+	// utils/alerts-permission.ts). Firefox builds from this same manifest
+	// (scripts/patch-firefox-build.js leaves it as is).
 	optional_permissions: ["notifications"],
 	// App content-channel bridge: relays window.postMessage from the ur.io app
 	// to the background over a Port. The only page↔extension channel that works

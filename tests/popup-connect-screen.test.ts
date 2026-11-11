@@ -23,6 +23,12 @@
 // - out of data shows the out-of-data alert (A);
 // - another extension, or policy, holding the proxy setting says so (B2);
 // - the status labels and messages were English in every language (B6).
+//
+// Owner, 2026-11-11 ("accept recommendation a"): the out-of-data
+// notification's permission is optional and was never asked for. While the
+// browser can be asked and has not granted it, the screen offers Turn on
+// alerts: in the out-of-data alert while that shows, under the settings
+// toggles otherwise, and nowhere once granted.
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement, type FC } from "react";
 import { renderToString } from "react-dom/server";
@@ -33,6 +39,7 @@ import type {
 	ConnectionStatus,
 	OutOfBalanceAlert,
 } from "../src/utils/connection-manager";
+import type { AlertsPermission } from "../src/utils/use-alerts-permission";
 
 const LIMIT =
 	"Your plan's limit of 5 active proxies is reached. Remove a proxy to create another, or upgrade to UR Pro for more.";
@@ -69,6 +76,11 @@ vi.mock("@/utils/use-provider-list-enhanced", () => ({
 	}),
 }));
 vi.mock("@urnetwork/sdk/react", () => ({ useAuth: () => ({ clearAuth: () => {} }) }));
+// the notifications permission as the screen's hook reports it
+const alerts: { permission: AlertsPermission } = { permission: "unread" };
+vi.mock("@/utils/use-alerts-permission", () => ({
+	useAlertsPermission: () => ({ permission: alerts.permission, requesting: false, turnOn: () => {} }),
+}));
 
 let ConnectScreen: FC;
 let mock: ChromeMock;
@@ -84,6 +96,7 @@ beforeEach(() => {
 	connection.error = null;
 	connection.outOfBalance = null;
 	connection.blocked = null;
+	alerts.permission = "unread";
 });
 
 // the html with the entities react-dom/server escapes text with decoded
@@ -119,6 +132,14 @@ function statusLine(html: string): string {
 function link(html: string, text: string): string | undefined {
 	return html.match(new RegExp(`<a[^>]*href="([^"]*)"[^>]*>${text}</a>`))?.[1];
 }
+
+// how many times html carries a marker
+function count(html: string, marker: string): number {
+	return html.split(marker).length - 1;
+}
+
+const TURN_ON_ALERTS = 'data-testid="turn-on-alerts"';
+const TURN_ON_ALERTS_ROW = 'data-testid="turn-on-alerts-row"';
 
 describe("popup connect screen", () => {
 	it("the kill switch's degraded state shows why, and no reconnect", () => {
@@ -245,6 +266,73 @@ describe("popup connect screen", () => {
 			expect(html).not.toContain("press Disconnect first");
 			expect(html).not.toContain("Pages won't load");
 			expect(buttons(html)).toContain("Connect");
+		});
+	});
+
+	describe("Turn on alerts", () => {
+		it("not granted: offered under the settings toggles, with what it is for", () => {
+			alerts.permission = "not_granted";
+			connection.status = "connected";
+
+			const html = render();
+
+			expect(count(html, TURN_ON_ALERTS)).toBe(1);
+			expect(count(html, TURN_ON_ALERTS_ROW)).toBe(1);
+			expect(html).toContain(">Turn on alerts</button>");
+			expect(html).toContain("Get a notification when your data runs out.");
+			// below the toggles
+			expect(html.indexOf(TURN_ON_ALERTS_ROW)).toBeGreaterThan(html.indexOf('aria-label="Kill switch"'));
+		});
+
+		it("granted, not read yet, or a browser that cannot be asked: not offered", () => {
+			connection.status = "connected";
+			for (const permission of ["granted", "unread", "unavailable"] as const) {
+				alerts.permission = permission;
+
+				const html = render();
+
+				expect(count(html, TURN_ON_ALERTS), permission).toBe(0);
+				expect(html, permission).not.toContain("Get a notification when your data runs out.");
+			}
+		});
+
+		it("out of data and not granted: in the alert beside its links, and only there", () => {
+			alerts.permission = "not_granted";
+			connection.status = "out_of_balance";
+			connection.outOfBalance = { plan: "free", held: true };
+
+			const html = render();
+
+			expect(count(html, TURN_ON_ALERTS)).toBe(1);
+			expect(count(html, TURN_ON_ALERTS_ROW)).toBe(0);
+			const notice = html.indexOf('data-testid="out-of-data-notice"');
+			const buyData = html.indexOf('href="https://ur.io/buy-data"');
+			expect(notice).toBeGreaterThanOrEqual(0);
+			expect(html.indexOf(TURN_ON_ALERTS)).toBeGreaterThan(buyData);
+			expect(html.indexOf(TURN_ON_ALERTS)).toBeLessThan(html.indexOf('aria-label="Kill switch"'));
+		});
+
+		it("out of data and granted: the alert as it was", () => {
+			alerts.permission = "granted";
+			connection.status = "out_of_balance";
+			connection.outOfBalance = { plan: "pro", held: true };
+
+			const html = render();
+
+			expect(count(html, TURN_ON_ALERTS)).toBe(0);
+			expect(link(html, "Buy data")).toBe("https://ur.io/buy-data");
+		});
+
+		it("in the browser's language", () => {
+			mock.setLocale("de");
+			alerts.permission = "not_granted";
+			connection.status = "idle";
+
+			const html = render();
+
+			expect(html).toContain(`>${message("extension_turn_on_alerts", "de")}</button>`);
+			expect(html).toContain(message("extension_out_of_data_alerts_note", "de"));
+			expect(html).not.toContain("Turn on alerts");
 		});
 	});
 

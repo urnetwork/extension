@@ -8,8 +8,15 @@
 // to the user (owner, 2026-10-02). A failed check now reads the account
 // balance, and with no data left it keeps the proxy set whatever the kill
 // switch says, tells the popup (the out-of-data alert), and posts one browser
-// notification per episode where the browser already allows it. Other
-// failures keep the documented behaviour.
+// notification per episode where the browser allows it. Other failures keep
+// the documented behaviour.
+//
+// The notification's permission is optional, and only the popup's Turn on
+// alerts asks for it (owner, 2026-11-11, utils/alerts-permission.ts): the
+// background never does. Without it, a "!" on the toolbar icon is the alert
+// with the popup closed; the badge shows with the permission too. Taken back
+// during an episode, the permission granted again posts the episode's
+// notification anew.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBridgeHarness, makeJwt, NETWORK_ID, type BridgeHarness } from "./bridge/harness";
 import { message, SYSTEM_PROXY } from "./chrome-mock";
@@ -43,7 +50,15 @@ const OUR_PROXY = {
 type Notifications = {
 	create: ReturnType<typeof vi.fn>;
 	clear: ReturnType<typeof vi.fn>;
+	// the permissions API's request, which only the popup's Turn on alerts calls
+	request: ReturnType<typeof vi.fn>;
+	// the user grants the permission, or takes it back in the browser's settings
+	setGranted: (granted: boolean) => void;
 };
+
+// what the toolbar badge's calls take (chrome.action)
+type BadgeText = { text: string };
+type BadgeColor = { color: string };
 
 describe("out of data", () => {
 	let h: BridgeHarness;
@@ -55,15 +70,38 @@ describe("out of data", () => {
 
 	// the browser lets the extension post notifications, or not
 	function allowNotifications(granted: boolean): Notifications {
+		const permission = { granted };
 		const notifications = {
 			create: vi.fn(async (id: string) => id),
 			clear: vi.fn(async () => true),
 		};
+		const request = vi.fn(async () => permission.granted);
 		Object.assign(h.chrome.chrome, {
-			permissions: { contains: vi.fn(async () => granted) },
+			permissions: { contains: vi.fn(async () => permission.granted), request },
 			notifications,
 		});
-		return notifications;
+		return {
+			...notifications,
+			request,
+			setGranted: (next: boolean) => {
+				permission.granted = next;
+			},
+		};
+	}
+
+	// the extension's toolbar icon, whose badge the episode sets
+	function toolbarBadge() {
+		const action = {
+			setBadgeText: vi.fn<(details: BadgeText) => Promise<void>>(async () => {}),
+			setBadgeBackgroundColor: vi.fn<(details: BadgeColor) => Promise<void>>(async () => {}),
+			setBadgeTextColor: vi.fn<(details: BadgeColor) => Promise<void>>(async () => {}),
+		};
+		Object.assign(h.chrome.chrome, { action });
+		return {
+			action,
+			// the badge's text as last set; undefined if it was never set
+			text: () => action.setBadgeText.mock.calls.at(-1)?.[0].text,
+		};
 	}
 
 	beforeEach(async () => {
@@ -155,8 +193,83 @@ describe("out of data", () => {
 		for (let i = 0; i < 3; i++) await schedule.check();
 
 		expect(notifications.create).not.toHaveBeenCalled();
+		// only the user's click in the popup asks (utils/alerts-permission.ts)
+		expect(notifications.request).not.toHaveBeenCalled();
 		expect(h.chrome.getStored("proxy_out_of_balance")).toMatchObject({ notified: false });
 		expect(h.chrome.getStored("proxy_health_report")).toBe("out_of_balance");
+	});
+
+	it("alerts turned on during the episode: its notification is posted", async () => {
+		const notifications = allowNotifications(false);
+		await schedule.check();
+		expect(notifications.create).not.toHaveBeenCalled();
+
+		// Turn on alerts in the popup
+		notifications.setGranted(true);
+		expect(await schedule.check()).toBe("out_of_balance");
+
+		expect(notifications.create).toHaveBeenCalledTimes(1);
+		expect(h.chrome.getStored("proxy_out_of_balance")).toMatchObject({ notified: true });
+		await schedule.check();
+		expect(notifications.create).toHaveBeenCalledTimes(1);
+	});
+
+	it("the permission taken back during the episode: turned on again, the episode notifies anew", async () => {
+		const notifications = allowNotifications(true);
+		await schedule.check();
+		expect(notifications.create).toHaveBeenCalledTimes(1);
+
+		// taken back in the browser's settings: nothing is posted meanwhile
+		notifications.setGranted(false);
+		expect(await schedule.check()).toBe("out_of_balance");
+		expect(notifications.create).toHaveBeenCalledTimes(1);
+		expect(h.chrome.getStored("proxy_out_of_balance")).toMatchObject({ notified: false });
+		expect(h.chrome.getStored("proxy_health_report")).toBe("out_of_balance");
+
+		// and turned on again in the popup
+		notifications.setGranted(true);
+		await schedule.check();
+		expect(notifications.create).toHaveBeenCalledTimes(2);
+		expect(h.chrome.getStored("proxy_out_of_balance")).toMatchObject({ notified: true });
+		expect(notifications.request).not.toHaveBeenCalled();
+	});
+
+	it("the toolbar badge shows the episode, without the permission and with it, and goes with it", async () => {
+		const badge = toolbarBadge();
+		const notifications = allowNotifications(false);
+
+		expect(await schedule.check()).toBe("out_of_balance");
+		expect(badge.text()).toBe("!");
+		expect(badge.action.setBadgeBackgroundColor).toHaveBeenCalled();
+
+		notifications.setGranted(true);
+		await schedule.check();
+		expect(notifications.create).toHaveBeenCalledTimes(1);
+		expect(badge.text()).toBe("!");
+
+		// data is back: the episode ends, and the badge goes
+		vi.stubGlobal("fetch", async () => ({ ok: true }));
+		expect(await schedule.check()).toBe("healthy");
+		expect(badge.text()).toBe("");
+	});
+
+	it("a disconnect takes the badge off", async () => {
+		const badge = toolbarBadge();
+		await schedule.check();
+		expect(badge.text()).toBe("!");
+
+		await h.bridge.disconnectFromPopup();
+
+		expect(badge.text()).toBe("");
+	});
+
+	it("no badge while data is left", async () => {
+		const badge = toolbarBadge();
+		h.api.subscriptionBalance.mockImplementation(async () => DATA_LEFT);
+
+		expect(await schedule.check()).toBe("failing");
+
+		expect(badge.text()).toBeUndefined();
 	});
 
 	it("a balance that does not come back keeps the episode", async () => {

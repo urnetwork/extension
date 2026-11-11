@@ -11,6 +11,10 @@ import { BUY_DATA_URL, GET_PRO_URL, freeRefreshLine, outOfBalanceTitle } from "@
 // disconnects: Disconnect stays the button above it. While the proxy holds the
 // traffic, ur.io cannot load through it, so the alert says to disconnect
 // first; after a Disconnect it stays, with its links, until the popup closes.
+// Where the browser has not let the extension show notifications, Turn on
+// alerts sits beside the links (`turnOnAlerts`, popup/components/
+// TurnOnAlerts.tsx): granted, this episode's notification and the next ones
+// are posted.
 
 // the time now, a minute at a time, for the refresh countdown
 function useMinuteClock(): number {
@@ -22,7 +26,10 @@ function useMinuteClock(): number {
 	return now;
 }
 
-export const OutOfDataNotice: React.FC<{ alert: OutOfBalanceAlert }> = ({ alert }) => {
+export const OutOfDataNotice: React.FC<{ alert: OutOfBalanceAlert; turnOnAlerts?: React.ReactNode }> = ({
+	alert,
+	turnOnAlerts,
+}) => {
 	const now = useMinuteClock();
 	const pro = alert.plan === "pro";
 	const linkClass = "text-xs font-medium underline";
@@ -48,7 +55,7 @@ export const OutOfDataNotice: React.FC<{ alert: OutOfBalanceAlert }> = ({ alert 
 					</span>
 				</>
 			)}
-			<div className="mt-1 flex items-center gap-3">
+			<div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
 				{!pro && (
 					<a className={linkClass} href={GET_PRO_URL} target="_blank" rel="noopener noreferrer">
 						{getMessage("get_pro")}
@@ -57,6 +64,7 @@ export const OutOfDataNotice: React.FC<{ alert: OutOfBalanceAlert }> = ({ alert 
 				<a className={linkClass} href={BUY_DATA_URL} target="_blank" rel="noopener noreferrer">
 					{getMessage("extension_buy_data")}
 				</a>
+				{turnOnAlerts}
 			</div>
 		</div>
 	);
