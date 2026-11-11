@@ -52,9 +52,6 @@ describe("a burst of proxy errors", () => {
 			activeProxyClientIds: vi.fn(async () => null),
 			subscriptionBalance: vi.fn(async () => null),
 		}));
-		// the build's version constant (vite.config.ts define), which the
-		// background's sign-in module reads at load
-		vi.stubGlobal("__EXTENSION_VERSION__", "0.0.0-test");
 		// the background's start (restore after 2 s) never runs here
 		vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
 	});
