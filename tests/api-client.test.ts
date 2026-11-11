@@ -2,10 +2,13 @@
 // (@urnetwork/sdk/client). These pin the wire behavior the old fetch code had
 // — same endpoints, same bearer token, same error results the bridge and the
 // popup read — against a stubbed fetch (tests/setup.ts disables the network).
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installChromeMock } from "./chrome-mock";
 import { authNetworkClient, removeNetworkClient } from "../src/bridge/api";
 import { buildAuthParams } from "../src/utils/auth-params";
+
+const packageVersion: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 type Call = { url: string; method: string; headers: Headers; body: unknown };
 
@@ -57,6 +60,24 @@ describe("bridge authNetworkClient", () => {
 		expect(result.by_client_jwt).toBe("client.jwt");
 		expect(result.proxy_config_result?.instance_id).toBe("i");
 		expect(result.error).toBeFalsy();
+	});
+
+	// The server records the account's onboarding platform from the client info
+	// of the client that authenticates: the extension is the web platform's
+	// app, and its distribution names which build it is.
+	it("sends the extension's client info: web, its version and its build", async () => {
+		const calls = stubFetch(() => json(200, { by_client_jwt: "client.jwt" }));
+		await authNetworkClient(buildAuthParams(), "network.jwt");
+		await removeNetworkClient("client-1", "network.jwt");
+		expect(calls).toHaveLength(2);
+		for (const call of calls) {
+			expect(JSON.parse(call.headers.get("X-UR-ClientInfo") ?? "null")).toEqual({
+				v: 1,
+				device_type: "web",
+				app_version: packageVersion,
+				distribution: "extension_chrome",
+			});
+		}
 	});
 
 	it("resolves a handled failure (200 with error) as the result's error", async () => {
