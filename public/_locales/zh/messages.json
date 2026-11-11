@@ -1,22 +1,22 @@
 {
   "access_auth_code_instructions": {
-    "message": "要获取您的验证码，请创建账户并登录{link}ur.io{/link}。进入账户 -> 设置 -> 创建/复制验证码 -> 粘贴 -> 完成！",
+    "message": "要获取您的授权码，请创建账户并登录{link}ur.io{/link}。进入账户 -> 设置 -> 创建/复制授权码 -> 粘贴 -> 完成！",
     "description": "Instructions for accessing the authentication code.\nUse the {link}...{/link} markers to wrap the \"ur.io\" portion, which should be rendered as a clickable link.\nExample usage:\n  - Web: Replace {link} with <a href=\"https://ur.io\" target=\"_blank\"> and {/link} with </a>\n  - SwiftUI: Use AttributedString parsing to detect {link}...{/link} and apply .link attribute to the range\n  - Jetpack Compose: Use AnnotatedString with an annotation for the {link}...{/link} range, and handle clicks accordingly\n"
   },
   "auth_code_input_invalid": {
-    "message": "验证码无效或已过期。请登录 ur.io 获取有效验证码。",
+    "message": "授权码无效或已过期。请登录 ur.io 获取有效授权码。",
     "description": "Invalid auth code input error message"
   },
   "auth_code_input_label": {
-    "message": "验证码",
+    "message": "授权码",
     "description": "Auth code input label"
   },
   "authentication_code_input_placeholder": {
-    "message": "输入您的一次性验证码",
+    "message": "输入您的一次性授权码",
     "description": "Placeholder text for the authentication code input field"
   },
   "auth_code_input_placeholder": {
-    "message": "输入您的一次性验证码",
+    "message": "输入您的一次性授权码",
     "description": "Placeholder text for the authentication code input field"
   },
   "back": {
