@@ -136,7 +136,7 @@
     "description": "Browser extension popup, under the button while the status line reads Proxy managed by policy (extension_status_proxy_policy). Keep URnetwork as is."
   },
   "extension_proxy_unreachable_kill_switch": {
-    "message": "الوكيل لا يستجيب. يُبقي مفتاح القتل المتصفح غير متصل حتى يستجيب الوكيل.",
+    "message": "الوكيل لا يستجيب. يُبقي مفتاح الإيقاف المتصفح غير متصل حتى يستجيب الوكيل.",
     "description": "Browser extension popup, under the Disconnect button while the status line reads Proxy not answering (extension_status_proxy_not_answering): why pages don't load. Translate kill switch as the kill_switch key does."
   },
   "extension_setting_not_saved": {
@@ -192,7 +192,7 @@
     "description": "Join URnetwork title on the Create Network screen"
   },
   "kill_switch": {
-    "message": "مفتاح القتل",
+    "message": "مفتاح الإيقاف",
     "description": "Call to action"
   },
   "launch": {

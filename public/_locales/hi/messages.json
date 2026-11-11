@@ -64,7 +64,7 @@
     "description": "Provider list group title for devices"
   },
   "disconnect": {
-    "message": "डिस्कनेक्ट क",
+    "message": "डिस्कनेक्ट करें",
     "description": "Disconnect VPN button text"
   },
   "disconnected": {
