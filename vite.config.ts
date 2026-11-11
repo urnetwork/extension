@@ -95,6 +95,9 @@ function geoContentScripts(): Plugin {
 export default defineConfig({
 	define: {
 		__EXTENSION_VERSION__: JSON.stringify(version),
+		// which build this is: the extension reports it as its distribution
+		// (src/utils/client-info.ts)
+		__EXTENSION_BROWSER_TARGET__: JSON.stringify(isFirefox ? "firefox" : "chrome"),
 	},
 	build: {
 		outDir,

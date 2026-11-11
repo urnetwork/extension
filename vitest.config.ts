@@ -15,9 +15,15 @@
 // elements' Lit components render as their tags (lit's node build).
 import path from "node:path";
 import { defineConfig } from "vitest/config";
+import { version } from "./package.json";
 import { sdkAliases, sdkDedupe } from "./sdk-source";
 
 export default defineConfig({
+	// the build constants the sources read, as the Chrome build defines them
+	define: {
+		__EXTENSION_VERSION__: JSON.stringify(version),
+		__EXTENSION_BROWSER_TARGET__: JSON.stringify("chrome"),
+	},
 	resolve: {
 		alias: [
 			...sdkAliases,
