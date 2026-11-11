@@ -3,8 +3,10 @@
 // never disconnect when the balance runs out, because a disconnect the user did
 // not make can leak their traffic (owner, 2026-10-02): they alert, post a local
 // notification, and leave disconnecting to the user. So the extension keeps
-// its proxy set, whatever the kill switch says, and the popup shows when free
-// data refreshes, Get Pro and Buy data on ur.io, and Disconnect.
+// its proxy set, whatever the kill switch says, the popup shows when free
+// data refreshes, Get Pro and Buy data on ur.io, and Disconnect, and the
+// toolbar icon shows a "!" (and the browser a notification, once the user
+// turned alerts on).
 //
 // The hosted proxy does not say why it cannot carry a request (a CONNECT it has
 // no route for is answered 504 once its budget runs out, server
@@ -13,6 +15,7 @@
 // outOfData.js), the extension reads the account balance (GET
 // /subscription/balance, bridge/api.ts) when a health check fails
 // (utils/proxy-health.ts), with the same thresholds.
+import { notificationsGranted } from "./alerts-permission";
 
 // Below this much available data the server refuses a new contract
 // (server model/subscription_model.go: a contract shrinks to fit what is
@@ -83,26 +86,24 @@ export function outOfBalanceTitle(getMessage: GetMessage, pro: boolean): string 
 }
 
 // ── the browser notification ─────────────────────────────────────────────────
-// One per episode, and only where the browser already lets the extension post
-// notifications: the permission is optional (manifest.config.ts), and the
-// extension never asks for it. A required one would make the browser warn on
-// update and disable the extension until the user accepts, which takes its
-// proxy setting away meanwhile.
+// One per episode, and only where the browser lets the extension post
+// notifications: the permission is optional (manifest.config.ts), and only
+// the popup's Turn on alerts asks for it (utils/alerts-permission.ts). A
+// required one would make the browser warn on update and disable the
+// extension until the user accepts, which takes its proxy setting away
+// meanwhile. Without it, the popup's alert and the toolbar badge (below) are
+// the alert.
 
 export const OUT_OF_DATA_NOTIFICATION_ID = "urnetwork-out-of-data";
 
 async function mayNotify(): Promise<boolean> {
-	if (!chrome.permissions?.contains || !chrome.notifications?.create) return false;
-	try {
-		return await chrome.permissions.contains({ permissions: ["notifications"] });
-	} catch {
-		return false;
-	}
+	if (!chrome.notifications?.create) return false;
+	return notificationsGranted();
 }
 
 /**
- * Posts the episode's notification if the browser already allows it. Resolves
- * whether it was posted.
+ * Posts the episode's notification if the browser allows it. Resolves whether
+ * it was posted.
  */
 export async function postOutOfDataNotification(
 	getMessage: GetMessage,
@@ -131,5 +132,38 @@ export async function clearOutOfDataNotification(): Promise<void> {
 		await chrome.notifications.clear(OUT_OF_DATA_NOTIFICATION_ID);
 	} catch {
 		// nothing posted, or the permission went
+	}
+}
+
+// ── the toolbar badge ────────────────────────────────────────────────────────
+// A "!" on the extension's toolbar icon for as long as the episode lasts. It
+// needs no permission, so with the popup closed it is the alert wherever the
+// browser shows the extension no notifications, and it stays beside the
+// notification where it does. In the colors of the popup's alert.
+
+export const OUT_OF_DATA_BADGE_TEXT = "!";
+// --ur-color-yellow-light and --ur-color-black (elements/src/index.css)
+const OUT_OF_DATA_BADGE_COLOR = "#eff7bb";
+const OUT_OF_DATA_BADGE_TEXT_COLOR = "#101010";
+
+/** Shows the episode's badge. */
+export async function showOutOfDataBadge(): Promise<void> {
+	if (!chrome.action?.setBadgeText) return;
+	try {
+		await chrome.action.setBadgeBackgroundColor({ color: OUT_OF_DATA_BADGE_COLOR });
+		await chrome.action.setBadgeTextColor?.({ color: OUT_OF_DATA_BADGE_TEXT_COLOR });
+		await chrome.action.setBadgeText({ text: OUT_OF_DATA_BADGE_TEXT });
+	} catch {
+		// no toolbar icon to badge: the popup still shows the alert
+	}
+}
+
+/** Takes the badge off: the episode is over. */
+export async function clearOutOfDataBadge(): Promise<void> {
+	if (!chrome.action?.setBadgeText) return;
+	try {
+		await chrome.action.setBadgeText({ text: "" });
+	} catch {
+		// nothing to take off
 	}
 }

@@ -1,5 +1,6 @@
 import { proxyManager } from "../utils/proxy-manager";
 import { requestHealthCheck, type ProxyHealthTrigger } from "../utils/proxy-health";
+import { concernsNotifications } from "../utils/alerts-permission";
 import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
 import { isAllowedOrigin } from "../utils/origins";
@@ -77,6 +78,17 @@ chrome.alarms.create(HEALTH_ALARM_NAME, { periodInMinutes: 1 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
 	if (alarm.name === HEALTH_ALARM_NAME) {
+		healthCheck("scheduled");
+	}
+});
+
+// The user turned alerts on in the popup (utils/alerts-permission.ts). The
+// popup can close while the browser asks, so the grant is acted on here: a
+// check now, which posts the notification of an out-of-data episode in
+// progress (utils/proxy-health.ts), rather than at the next scheduled one.
+// Registered at the top level, so the event wakes the background.
+chrome.permissions?.onAdded?.addListener((permissions) => {
+	if (concernsNotifications(permissions)) {
 		healthCheck("scheduled");
 	}
 });

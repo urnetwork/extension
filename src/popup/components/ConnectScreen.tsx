@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Screen } from "./Screen";
 import { IpInfoBanner } from "./IpInfoBanner";
 import { OutOfDataNotice } from "./OutOfDataNotice";
+import { TurnOnAlertsButton } from "./TurnOnAlerts";
 import {
 	MenuItem,
 	UrButton,
@@ -22,6 +23,7 @@ import type { ConnectLocation } from "@/utils/sdk-types";
 import { chromeStorageAdapter } from "@/utils/storage-adapter";
 import { fetchIpInfo, type IpInfo } from "@/utils/ip-info";
 import { useConnectionManager } from "@/utils/use-connection-manager";
+import { useAlertsPermission } from "@/utils/use-alerts-permission";
 import { useProviderListEnhanced, type RegionGroup } from "@/utils/use-provider-list-enhanced";
 import {
 	getGeoSyncEnabled,
@@ -80,6 +82,16 @@ export const ConnectScreen: React.FC = () => {
 		loading: locationsLoading,
 		retry,
 	} = useProviderListEnhanced();
+
+	// The out-of-data notification's permission is optional, and Turn on alerts
+	// is how the user grants it (utils/alerts-permission.ts): offered while the
+	// browser can be asked and has not granted it, also after a refusal, and
+	// again after the user took it back
+	const {
+		permission: alertsPermission,
+		requesting: alertsRequesting,
+		turnOn: turnOnAlerts,
+	} = useAlertsPermission();
 
 	const [selectedLocation, setSelectedLocation] =
 		useState<ConnectLocation | null>(null);
@@ -442,6 +454,13 @@ export const ConnectScreen: React.FC = () => {
 		return template ? template.replace("{location}", place) : place;
 	})();
 
+	// Turn on alerts, while the browser can be asked and has not granted it: in
+	// the out-of-data alert while that shows, under the settings toggles otherwise
+	const turnOnAlertsButton =
+		alertsPermission === "not_granted" ? (
+			<TurnOnAlertsButton onClick={turnOnAlerts} requesting={alertsRequesting} />
+		) : null;
+
 	return (
 		<Screen>
 			{/* ── Left Panel: Connection Controls ── */}
@@ -519,7 +538,7 @@ export const ConnectScreen: React.FC = () => {
 						</p>
 					)}
 
-					{outOfBalance && <OutOfDataNotice alert={outOfBalance} />}
+					{outOfBalance && <OutOfDataNotice alert={outOfBalance} turnOnAlerts={turnOnAlertsButton} />}
 
 					{keptProxyError && (
 						<div className="mt-2 flex flex-col gap-1">
@@ -548,8 +567,10 @@ export const ConnectScreen: React.FC = () => {
 					)}
 				</div>
 
-				{/* Settings toggles */}
-				<div className="px-4 flex-1 flex flex-col gap-2">
+				{/* Settings toggles. min-h-0 and its own scroll: when the notices
+				    above take the room, the settings scroll rather than push the
+				    status line out of the popup */}
+				<div className="px-4 flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
 					<div className="rounded-xl p-3 flex flex-col gap-3" style={{ background: "var(--color-surface-2)" }}>
 						{/* Kill switch toggle */}
 						<div className="flex flex-col gap-1">
@@ -607,6 +628,17 @@ export const ConnectScreen: React.FC = () => {
 								</span>
 							)}
 						</div>
+
+						{/* Turn on alerts, with what it is for; the out-of-data alert
+						    carries it while that shows */}
+						{turnOnAlertsButton && !outOfBalance && (
+							<div className="flex flex-col items-start gap-0.5" data-testid="turn-on-alerts-row">
+								{turnOnAlertsButton}
+								<span className="text-[10px] opacity-50 leading-tight">
+									{getMessage("extension_out_of_data_alerts_note")}
+								</span>
+							</div>
+						)}
 					</div>
 				</div>
 

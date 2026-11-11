@@ -26,11 +26,14 @@
 // probe reads the account balance (bridge/api.ts subscriptionBalance), and
 // with no data left the check starts an out-of-balance episode: the proxy
 // stays set whatever the kill switch says (on Firefox too: no per-request
-// direct while it lasts), the popup shows the out-of-data alert, and one
-// browser notification is posted where the browser already allows it
-// (utils/out-of-balance.ts). Nothing falls back to direct for it. The episode
-// ends with a passing check, a balance that has data again, a connect or a
-// disconnect; while it lasts, a balance that does not come back keeps it.
+// direct while it lasts), the popup shows the out-of-data alert, the toolbar
+// icon a "!", and one browser notification is posted once the browser allows
+// it: the user turned alerts on in the popup (utils/alerts-permission.ts),
+// before the episode or during it. A permission taken back during the episode
+// lets a later grant post it anew (utils/out-of-balance.ts). Nothing falls
+// back to direct for it. The episode ends with a passing check, a balance that
+// has data again, a connect or a disconnect; while it lasts, a balance that
+// does not come back keeps it.
 //
 // The failure count lives in storage because the service worker can stop
 // between two runs. So do the episode and what a run last told the popup
@@ -39,10 +42,13 @@ import { proxyManager } from "./proxy-manager";
 import { getKillSwitch } from "./kill-switch";
 import { getMessage } from "./i18n";
 import { parseJwtClaims } from "./jwt-claims";
+import { notificationsGranted } from "./alerts-permission";
 import {
 	isOutOfData,
+	clearOutOfDataBadge,
 	clearOutOfDataNotification,
 	postOutOfDataNotification,
+	showOutOfDataBadge,
 	type BalanceReading,
 } from "./out-of-balance";
 import {
@@ -142,7 +148,10 @@ export async function clearProxyHealth(): Promise<void> {
 		STORAGE_KEY_OUT_OF_BALANCE,
 	]);
 	proxyManager.setTrafficHold(false);
-	if (episode) await clearOutOfDataNotification();
+	if (episode) {
+		await clearOutOfDataNotification();
+		await clearOutOfDataBadge();
+	}
 }
 
 /** The client the checks last gave up on, if any. */
@@ -211,8 +220,8 @@ async function readBalance(): Promise<{ outOfData: boolean; plan: OutOfBalancePl
 }
 
 // Starts or carries on an out-of-balance episode: no fallback and no failure
-// counted, the proxy holds the traffic, the popup is told, and the one
-// notification is posted once the browser allows it.
+// counted, the proxy holds the traffic, the popup is told, the toolbar badge
+// shows it, and the one notification is posted once the browser allows it.
 async function holdOutOfBalance(
 	plan: OutOfBalancePlan,
 	episode: OutOfBalanceEpisode | null,
@@ -224,8 +233,14 @@ async function holdOutOfBalance(
 		notified: episode?.notified ?? false,
 	};
 	proxyManager.setTrafficHold(true);
+	// every run, so a browser restart that dropped the badge gets it back
+	await showOutOfDataBadge();
 	if (!next.notified) {
 		next.notified = await postOutOfDataNotification(getMessage, plan === "pro", now);
+	} else if (!(await notificationsGranted())) {
+		// the user took the permission back: once they turn alerts on again,
+		// the episode's notification is posted anew
+		next.notified = false;
 	}
 	await chrome.storage.local.set({
 		[STORAGE_KEY_OUT_OF_BALANCE]: next,
@@ -243,6 +258,7 @@ async function endOutOfBalance(): Promise<void> {
 	await chrome.storage.local.remove([STORAGE_KEY_OUT_OF_BALANCE, STORAGE_KEY_PROXY_HEALTH_REPORT]);
 	proxyManager.setTrafficHold(false);
 	await clearOutOfDataNotification();
+	await clearOutOfDataBadge();
 }
 
 /**
