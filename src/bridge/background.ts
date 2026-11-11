@@ -710,6 +710,10 @@ async function handleVerb(
 				user,
 				session,
 				killSwitch,
+				// out of data, this extension holds the browser's traffic whatever
+				// the kill switch says (utils/proxy-health.ts); an older one goes
+				// direct with it off, so a page says which one it talks to
+				outOfDataHeld: true,
 			};
 		}
 		case "GET_USER": {
