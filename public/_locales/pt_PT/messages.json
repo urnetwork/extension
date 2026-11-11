@@ -115,6 +115,10 @@
     "message": "O navegador continua ligado à localização anterior.",
     "description": "Browser extension popup, under the reason a location change failed: the change did not happen, and the browser stays connected through the proxy and the location it had before."
   },
+  "extension_out_of_data_alerts_note": {
+    "message": "Receba uma notificação quando os seus dados se esgotarem.",
+    "description": "Browser extension popup, under the settings toggles, beside the Turn on alerts button (extension_turn_on_alerts): what the alerts are. Once the user allows it, the browser shows one notification when the account's data runs out, also while the popup is closed."
+  },
   "extension_out_of_data_held": {
     "message": "As páginas não carregam neste navegador até haver dados disponíveis ou até se desligar.",
     "description": "Browser extension popup, out-of-balance alert, and the body of the browser notification for it: the account has no data left, and the extension keeps its proxy set whatever the kill switch says, so pages fail rather than load without URnetwork, until the free refresh, an upgrade or a data pack makes data available, or the user presses Disconnect. The ur.io counterpart is site_out_of_data_browser_held, without its kill switch clause."
@@ -154,6 +158,10 @@
   "extension_status_proxy_policy": {
     "message": "Proxy gerido por uma política",
     "description": "Browser extension popup, status line at its foot: the browser's proxy settings are fixed by policy (set by an administrator or an organization), so no extension can set them and URnetwork is not connected. Short; use the word the browser itself uses for its managed settings in the language."
+  },
+  "extension_turn_on_alerts": {
+    "message": "Ativar alertas",
+    "description": "Browser extension popup: a small button, shown while the browser has not let the extension show notifications, that asks the browser for that permission. With it, the extension shows one browser notification when the account runs out of data; without it, the popup's alert and a ! on the toolbar icon show it. It sits under the settings toggles beside extension_out_of_data_alerts_note, and in the out-of-data alert beside Get Pro and Buy data. Short."
   },
   "forgot_password": {
     "message": "Esqueceu sua senha?",
