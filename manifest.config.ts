@@ -42,6 +42,10 @@ export default defineManifest({
 			type: "module",
 		},
 	permissions: ["proxy", "storage", "alarms", "tabs", "identity"],
+	// The out-of-data notification (utils/out-of-balance.ts) is posted only
+	// where the browser already allows it: optional, so an update asks nothing
+	// and keeps the extension enabled, and the extension never requests it.
+	optional_permissions: ["notifications"],
 	// App content-channel bridge: relays window.postMessage from the ur.io app
 	// to the background over a Port. The only page↔extension channel that works
 	// on Firefox too (externally_connectable is Chromium-only for web pages).

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Screen } from "./Screen";
 import { IpInfoBanner } from "./IpInfoBanner";
+import { OutOfDataNotice } from "./OutOfDataNotice";
 import {
 	MenuItem,
 	UrButton,
@@ -28,6 +29,8 @@ import {
 	setGeoSyncEnabled as persistGeoSyncEnabled,
 } from "@/utils/geo-sync";
 import { watchKillSwitch } from "@/utils/kill-switch";
+import { toggleSetting, type SettingToggleState } from "@/utils/setting-toggle";
+import type { ProxyView } from "@/utils/proxy-control";
 import {
 	STORAGE_KEY_GEO_ENABLED,
 	STORAGE_KEY_GEO_POSITION,
@@ -35,6 +38,9 @@ import {
 } from "@/content/geo-protocol";
 
 const STORAGE_KEY_LOCATION = "selected_connect_location";
+
+// a stored setting not read yet
+const UNREAD: SettingToggleState = { value: null, saving: false, failed: false };
 
 function locationKey(location?: ConnectLocation): string {
 	if (!location) return "best-available-provider";
@@ -57,6 +63,8 @@ export const ConnectScreen: React.FC = () => {
 	const {
 		status,
 		error: connectionError,
+		outOfBalance,
+		blocked,
 		connect,
 		disconnect,
 		endSession,
@@ -78,31 +86,45 @@ export const ConnectScreen: React.FC = () => {
 	const [isLoggingOut, setIsLoggingOut] = useState(false);
 	const ipFailCountRef = useRef(0);
 	const [proxyActiveButUnreachable, setProxyActiveButUnreachable] = useState(false);
-	// the stored kill switch, null until it is read: the toggle shows neither
-	// state before then (it is off unless the user turned it on)
-	const [killSwitch, setKillSwitchLocal] = useState<boolean | null>(null);
+	// the stored kill switch, unread (null) until it is read: the toggle shows
+	// neither state before then (it is off unless the user turned it on)
+	const [killSwitch, setKillSwitch] = useState<SettingToggleState>(UNREAD);
 
-	useEffect(() => watchKillSwitch(setKillSwitchLocal), []);
+	useEffect(
+		() =>
+			watchKillSwitch((enabled) =>
+				setKillSwitch((state) => (state.saving ? state : { ...state, value: enabled })),
+			),
+		[],
+	);
 
+	// The background saves it (background/index.ts SET_KILL_SWITCH). A save that
+	// fails puts the toggle back and says so.
 	const handleKillSwitchToggle = useCallback(() => {
-		if (killSwitch === null) return;
-		const next = !killSwitch;
-		setKillSwitchLocal(next);
-		chrome.runtime.sendMessage({ type: "SET_KILL_SWITCH", enabled: next }).catch(() => {});
+		void toggleSetting(
+			killSwitch,
+			async (enabled) => {
+				const res = (await chrome.runtime.sendMessage({ type: "SET_KILL_SWITCH", enabled })) as
+					| { success?: boolean }
+					| undefined;
+				return res?.success === true;
+			},
+			setKillSwitch,
+		);
 	}, [killSwitch]);
 
 	// ── location sync (geolocation override) ─────────────────────────────────
 	// Opt-in, off by default. Both pieces of state live in chrome.storage.local
 	// so the content scripts read them directly (see content/geo-config.ts) —
-	// this screen only mirrors them. Like the kill switch, null until read.
-	const [geoSync, setGeoSync] = useState<boolean | null>(null);
+	// this screen only mirrors them. Like the kill switch, unread until read.
+	const [geoSync, setGeoSync] = useState<SettingToggleState>(UNREAD);
 	const [geoPosition, setGeoPosition] = useState<GeoSyncPosition | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
 		Promise.all([getGeoSyncEnabled(), getGeoSyncPosition()]).then(([enabled, position]) => {
 			if (cancelled) return;
-			setGeoSync(enabled);
+			setGeoSync((state) => ({ ...state, value: enabled }));
 			setGeoPosition(position);
 		});
 		const onStorageChanged = (
@@ -111,7 +133,8 @@ export const ConnectScreen: React.FC = () => {
 		) => {
 			if (area !== "local") return;
 			if (changes[STORAGE_KEY_GEO_ENABLED]) {
-				setGeoSync(changes[STORAGE_KEY_GEO_ENABLED].newValue === true);
+				const enabled = changes[STORAGE_KEY_GEO_ENABLED].newValue === true;
+				setGeoSync((state) => (state.saving ? state : { ...state, value: enabled }));
 			}
 			if (changes[STORAGE_KEY_GEO_POSITION]) {
 				const next = changes[STORAGE_KEY_GEO_POSITION].newValue;
@@ -126,11 +149,22 @@ export const ConnectScreen: React.FC = () => {
 	}, []);
 
 	const handleGeoSyncToggle = useCallback(() => {
-		if (geoSync === null) return;
-		const next = !geoSync;
-		setGeoSync(next);
-		if (!next) setGeoPosition(null);
-		persistGeoSyncEnabled(next).catch(() => {});
+		if (geoSync.value === null || geoSync.saving) return;
+		if (geoSync.value) setGeoPosition(null);
+		void toggleSetting(
+			geoSync,
+			async (enabled) => {
+				await persistGeoSyncEnabled(enabled);
+				return true;
+			},
+			setGeoSync,
+		).then(async (done) => {
+			if (!done.failed) return;
+			// a failed save may have stored part of the change: show what is stored
+			const [enabled, position] = await Promise.all([getGeoSyncEnabled(), getGeoSyncPosition()]);
+			setGeoSync((state) => ({ ...state, value: enabled }));
+			setGeoPosition(position);
+		});
 	}, [geoSync]);
 
 	useEffect(() => {
@@ -194,6 +228,7 @@ export const ConnectScreen: React.FC = () => {
 	useEffect(() => {
 		let cancelled = false;
 		async function init() {
+			let view: ProxyView | null = null;
 			try {
 				// Clear stale connection_mode key from older versions
 				chrome.storage.local.remove("connection_mode");
@@ -203,21 +238,26 @@ export const ConnectScreen: React.FC = () => {
 					chromeStorageAdapter.getItem(STORAGE_KEY_LOCATION),
 				]);
 				if (cancelled) return;
-				let restoredLocation: ConnectLocation | null = null;
 				if (storedLocation) {
 					try {
-						restoredLocation = JSON.parse(storedLocation);
-						setSelectedLocation(restoredLocation);
+						setSelectedLocation(JSON.parse(storedLocation));
 					} catch {
 						await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
 					}
 				}
 				if (cancelled) return;
-				// shows what the health check last reported, not a fresh Connected
-				await reattach(Boolean(vpnResponse?.success && vpnResponse.state?.enabled));
+				const answer = vpnResponse as { success?: boolean; state?: { enabled?: boolean }; view?: ProxyView } | undefined;
+				// an older background answers without a view
+				view = answer?.view ?? (answer?.success
+					? { enabled: Boolean(answer.state?.enabled), control: "available", intent: Boolean(answer.state?.enabled) }
+					: null);
 			} catch (err) {
 				if (!cancelled) console.error("Failed to load initial state:", err);
 			}
+			if (cancelled) return;
+			// shows what the health check last reported, not a fresh Connected;
+			// a background that did not answer leaves the popup at Disconnected
+			await reattach(view);
 		}
 		init();
 		return () => { cancelled = true; };
@@ -245,7 +285,7 @@ export const ConnectScreen: React.FC = () => {
 
 	// ── connect / disconnect ─────────────────────────────────────────────────
 	const handleConnect = useCallback(
-		async (location?: ConnectLocation) => { await connect(location); },
+		(location?: ConnectLocation) => connect(location),
 		[connect],
 	);
 
@@ -255,21 +295,31 @@ export const ConnectScreen: React.FC = () => {
 
 	// ── location selection ────────────────────────────────────────────────────
 
+	// stores the displayed pick (the background reads it on an older version's
+	// upgrade, bridge/background.ts storedPopupLocation)
+	const showLocation = useCallback(async (location: ConnectLocation | null) => {
+		setSelectedLocation(location);
+		if (location) {
+			await chromeStorageAdapter.setItem(STORAGE_KEY_LOCATION, JSON.stringify(location));
+		} else {
+			await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
+		}
+	}, []);
+
 	// Apply a location change. When already connected, try to delegate the change
 	// to an attached ur.io app's DeviceRemote (device-rpc → the hosted device
 	// re-routes with NO proxy reconnect, and every attached surface gets
 	// connectLocationChange). If no app is attached (or delegation fails), fall
-	// back to the normal connect/swap. When idle, just connect here.
+	// back to the normal connect/swap. When idle, just connect here. A connect
+	// that fails with the previous proxy still set leaves the browser where it
+	// was, so the card goes back to the location it was connected at.
 	const applyLocationChange = useCallback(
 		async (location: ConnectLocation | null) => {
-			setSelectedLocation(location);
-			if (location) {
-				await chromeStorageAdapter.setItem(STORAGE_KEY_LOCATION, JSON.stringify(location));
-			} else {
-				await chromeStorageAdapter.removeItem(STORAGE_KEY_LOCATION);
-			}
+			const previous = selectedLocation;
+			await showLocation(location);
 
-			const isConnected = status === "connected" || status === "degraded";
+			const isConnected =
+				status === "connected" || status === "degraded" || status === "out_of_balance";
 
 			if (isConnected) {
 				try {
@@ -285,9 +335,11 @@ export const ConnectScreen: React.FC = () => {
 					// no receiver / delegation failed — fall through to reconnect
 				}
 			}
-			await handleConnect(location ?? undefined);
+			if ((await handleConnect(location ?? undefined)) === "kept") {
+				await showLocation(previous);
+			}
 		},
-		[status, handleConnect],
+		[status, selectedLocation, showLocation, handleConnect],
 	);
 
 	const selectLocation = useCallback(
@@ -341,17 +393,48 @@ export const ConnectScreen: React.FC = () => {
 		);
 	}
 
+	const isLoading = status === "loading";
 	const isActive = status === "connected";
 	const isConnecting = status === "connecting";
 	// the kill switch keeps a proxy that does not answer; nothing reconnects
 	// (utils/proxy-health.ts), so the popup says why the browser is offline
 	const isDegraded = status === "degraded";
+	// out of data the proxy stays set whatever the kill switch says
+	// (utils/out-of-balance.ts); Disconnect is the user's
+	const isOutOfBalance = status === "out_of_balance";
+	const isBlocked = status === "blocked";
+	// the browser is set to the extension's proxy, so Disconnect takes it off;
+	// another extension holding the setting over the extension's own value is
+	// ended by a Disconnect too
+	const showsDisconnect =
+		isActive || isDegraded || isOutOfBalance || isConnecting || (isBlocked && blocked?.intent === true);
+	// a connect failed while the previous proxy stayed set: a location change
+	// that did not happen
+	const keptProxyError = (isActive || isDegraded || isOutOfBalance) && connectionError !== null;
+
+	const statusLabel = isLoading
+		? " "
+		: isActive
+			? getMessage("connected")
+			: isConnecting
+				? getMessage("site_app_connecting")
+				: isDegraded
+					? getMessage("extension_status_proxy_not_answering")
+					: isOutOfBalance
+						? getMessage(outOfBalance?.plan === "pro" ? "data_limit_reached" : "insufficient_balance")
+						: isBlocked
+							? getMessage(
+									blocked?.control === "policy"
+										? "extension_status_proxy_policy"
+										: "extension_status_other_extension",
+								)
+							: getMessage("disconnected");
 
 	// The note under the location sync toggle: the resting line describes the
 	// rule (oldest connected provider = the most stable one), and the two live
 	// states replace it once the toggle is on.
 	const geoSyncNote = (() => {
-		if (!geoSync) return getMessage("use_most_stable_provider");
+		if (!geoSync.value) return getMessage("use_most_stable_provider");
 		if (!geoPosition) return getMessage("mock_location_waiting_for_provider");
 		const place =
 			geoPosition.label || `${geoPosition.lat.toFixed(3)}, ${geoPosition.lon.toFixed(3)}`;
@@ -374,7 +457,7 @@ export const ConnectScreen: React.FC = () => {
 							<UrText>{getMessage("licenses")}</UrText>
 						</MenuItem>
 						<MenuItem className="text-left" onMenuItemClick={handleLogout}>
-							<UrText>Logout</UrText>
+							<UrText>{getMessage("sign_out")}</UrText>
 						</MenuItem>
 					</UrMenu>
 				</div>
@@ -404,7 +487,15 @@ export const ConnectScreen: React.FC = () => {
 
 				{/* Connect / Disconnect button */}
 				<div className="px-4 mb-4">
-					{isActive || isDegraded || isConnecting ? (
+					{isLoading ? (
+						// the background has not said how the proxy stands: neither
+						// Connect nor Disconnect yet
+						<div aria-busy="true" data-testid="connection-loading">
+							<UrButton loading disabled variant="secondary" fullWidth>
+								<UrText>{" "}</UrText>
+							</UrButton>
+						</div>
+					) : showsDisconnect ? (
 						<UrButton onClick={handleDisconnect} loading={false} disabled={false} variant="secondary" fullWidth>
 							<UrText>{getMessage("disconnect")}</UrText>
 						</UrButton>
@@ -414,15 +505,34 @@ export const ConnectScreen: React.FC = () => {
 						</UrButton>
 					)}
 
-					{isDegraded && connectionError && (
+					{isDegraded && (
 						<p className="mt-2 text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
-							{connectionError}
+							{getMessage("extension_proxy_unreachable_kill_switch")}
 						</p>
 					)}
 
-					{proxyActiveButUnreachable && !isDegraded && (
+					{isBlocked && (
 						<p className="mt-2 text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
-							Proxy active but network unreachable.
+							{getMessage(
+								blocked?.control === "policy" ? "extension_proxy_policy" : "extension_proxy_other_extension",
+							)}
+						</p>
+					)}
+
+					{outOfBalance && <OutOfDataNotice alert={outOfBalance} />}
+
+					{keptProxyError && (
+						<div className="mt-2 flex flex-col gap-1">
+							<span className="text-xs" style={{ color: "var(--ur-color-coral)" }}>
+								{connectionError}
+							</span>
+							<span className="text-xs opacity-70">{getMessage("extension_location_unchanged")}</span>
+						</div>
+					)}
+
+					{proxyActiveButUnreachable && !isDegraded && !isOutOfBalance && (
+						<p className="mt-2 text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
+							{getMessage("extension_proxy_active_network_unreachable")}
 						</p>
 					)}
 
@@ -442,18 +552,30 @@ export const ConnectScreen: React.FC = () => {
 				<div className="px-4 flex-1 flex flex-col gap-2">
 					<div className="rounded-xl p-3 flex flex-col gap-3" style={{ background: "var(--color-surface-2)" }}>
 						{/* Kill switch toggle */}
-						<div className="flex items-center justify-between gap-2">
-							<div className="flex flex-col gap-0.5 flex-1 min-w-0">
-								<span className="text-xs font-medium">Kill Switch</span>
-								<span className="text-[10px] opacity-50 leading-tight">
-									{killSwitch === null
-										? "\u00a0"
-										: killSwitch
-											? "Blocks traffic on failure"
-											: "Traffic may leak on failure"}
-								</span>
+						<div className="flex flex-col gap-1">
+							<div className="flex items-center justify-between gap-2">
+								<div className="flex flex-col gap-0.5 flex-1 min-w-0">
+									<span className="text-xs font-medium">{getMessage("kill_switch")}</span>
+									<span className="text-[10px] opacity-50 leading-tight">
+										{killSwitch.value === null
+											? " "
+											: killSwitch.value
+												? getMessage("extension_kill_switch_blocks_on_failure")
+												: getMessage("extension_kill_switch_may_leak_on_failure")}
+									</span>
+								</div>
+								<ToggleSwitch
+									enabled={killSwitch.value}
+									onToggle={handleKillSwitchToggle}
+									disabled={killSwitch.saving}
+									label={getMessage("kill_switch")}
+								/>
 							</div>
-							<ToggleSwitch enabled={killSwitch} onToggle={handleKillSwitchToggle} label="Toggle kill switch" />
+							{killSwitch.failed && (
+								<span className="text-[10px] leading-tight" role="alert" style={{ color: "var(--ur-color-coral)" }}>
+									{getMessage("extension_setting_not_saved")}
+								</span>
+							)}
 						</div>
 
 						{/* Location sync (geolocation override) */}
@@ -463,17 +585,23 @@ export const ConnectScreen: React.FC = () => {
 									{getMessage("sync_device_location_with_provider")}
 								</span>
 								<ToggleSwitch
-									enabled={geoSync}
+									enabled={geoSync.value}
 									onToggle={handleGeoSyncToggle}
+									disabled={geoSync.saving}
 									label={getMessage("sync_device_location_with_provider")}
 								/>
 							</div>
+							{geoSync.failed && (
+								<span className="text-[10px] leading-tight" role="alert" style={{ color: "var(--ur-color-coral)" }}>
+									{getMessage("extension_setting_not_saved")}
+								</span>
+							)}
 							<span className="text-[10px] opacity-60 leading-tight">{geoSyncNote}</span>
 							{/* honest scope: a page-level shim, not a device or browser guarantee */}
 							<span className="text-[10px] opacity-50 leading-tight">
 								{getMessage("mock_location_disclosure_browser_only")}
 							</span>
-							{geoSync && (
+							{geoSync.value && (
 								<span className="text-[10px] opacity-50 leading-tight">
 									{getMessage("mock_location_disclosure_sites_can_detect")}
 								</span>
@@ -484,25 +612,19 @@ export const ConnectScreen: React.FC = () => {
 
 				{/* Connection status indicator at bottom */}
 				<div className="px-4 py-3 mt-auto">
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2" aria-busy={isLoading ? true : undefined}>
 						<span
 							className="size-2 rounded-full shrink-0 transition-colors duration-300"
 							style={{
 								backgroundColor: isActive
 									? "var(--ur-color-green, #22c55e)"
-									: isConnecting || isDegraded
+									: isConnecting || isDegraded || isOutOfBalance
 										? "var(--ur-color-yellow-light, #fbbf24)"
 										: "var(--ur-color-gray, #6b7280)",
 							}}
 						/>
-						<span className="text-[11px] opacity-60">
-							{isActive
-								? "Connected"
-								: isConnecting
-									? "Connecting..."
-									: isDegraded
-										? "Proxy not answering"
-										: "Disconnected"}
+						<span className="text-[11px] opacity-60" data-testid="connection-status">
+							{statusLabel}
 						</span>
 					</div>
 				</div>
@@ -515,7 +637,7 @@ export const ConnectScreen: React.FC = () => {
 					<p className="text-center text-xs font-medium opacity-50 mb-2">{getMessage("search_providers_input_label")}</p>
 					<div className="rounded-xl overflow-hidden" style={{ background: "var(--color-surface-2)" }}>
 						<UrInput
-							placeholder="Search countries, cities, regions..."
+							placeholder={getMessage("search_providers_input_placeholder")}
 							value={query}
 							onInput={(e) => setQuery(e.detail.value)}
 						/>

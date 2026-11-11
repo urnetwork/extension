@@ -22,6 +22,8 @@
 //   failure before it asks nothing.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createBridgeHarness, makeJwt, NETWORK_ID, type BridgeHarness, type FakePort } from "./harness";
+import { SYSTEM_PROXY } from "../chrome-mock";
+import { minuteSchedule, type MinuteSchedule } from "../health-schedule";
 
 const JWT = makeJwt({ network_id: NETWORK_ID, network_name: "testnet", user_id: "user-1" });
 
@@ -56,6 +58,7 @@ describe("the install's client at the proxy cap and after the server removed it"
 	let h: BridgeHarness;
 	let app: FakePort;
 	let health: HealthModule;
+	let schedule: MinuteSchedule;
 	// the network's active hosted proxies on the fake server
 	let active: Set<string>;
 
@@ -84,16 +87,18 @@ describe("the install's client at the proxy cap and after the server removed it"
 		h.api.activeProxyClientIds.mockImplementation(async () => new Set(active));
 	}
 
-	// tests/setup.ts fails every fetch, so each check fails; the third takes the
-	// proxy off (kill switch off)
+	// tests/setup.ts fails every fetch, so each check of the minute schedule
+	// fails; the third takes the proxy off (kill switch off), releasing the
+	// browser's setting
 	async function failHealthChecks(): Promise<void> {
-		for (let i = 0; i < 3; i++) await health.performHealthCheck();
-		expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+		for (let i = 0; i < 3; i++) await schedule.check();
+		expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
 	}
 
 	beforeEach(async () => {
 		h = await createBridgeHarness();
 		health = await import("../../src/utils/proxy-health");
+		schedule = minuteSchedule(health);
 		app = h.connect();
 		await app.request("SETUP", { jwt: JWT });
 		h.chrome.resetCalls();
@@ -139,7 +144,7 @@ describe("the install's client at the proxy cap and after the server removed it"
 		expect(res).toMatchObject({ ok: false, error: RATE_MESSAGE, code: "upgrade_required" });
 		expect(h.api.removeNetworkClient).toHaveBeenCalledWith(clientId(1), JWT);
 		expect(h.chrome.getStored("bridge_session")).toBeUndefined();
-		expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+		expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
 		expect(app.events).toContainEqual(
 			expect.objectContaining({ event: "SESSION_CHANGED", payload: expect.objectContaining({ reason: "disconnect" }) }),
 		);
@@ -191,7 +196,7 @@ describe("the install's client at the proxy cap and after the server removed it"
 		expect(provisions()).toBe(1);
 		expect(h.api.removeNetworkClient).not.toHaveBeenCalled();
 		expect(active).toEqual(new Set(others));
-		expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+		expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
 	});
 
 	it("a connect after the checks gave up provisions anew when the server no longer has the client", async () => {

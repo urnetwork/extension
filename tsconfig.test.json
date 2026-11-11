@@ -8,7 +8,9 @@
 		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
 		"types": ["vite/client", "chrome", "node"]
 	},
-	"include": ["tests"],
+	// src/env.d.ts: the build's constants, for the background entry point the
+	// tests load (tests/health-burst.test.ts)
+	"include": ["tests", "src/env.d.ts"],
 	// not inherited through "extends"; test:types builds it first
 	"references": [{ "path": "./tsconfig.sdk.json" }]
 }

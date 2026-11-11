@@ -63,6 +63,7 @@
 // extension keeps the last one per network and provisions every new client
 // with it (see utils/performance-profile.ts).
 import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
+import { PROXY_CONTROL_REFUSALS, isControlRefusal, type ProxyView } from "../utils/proxy-control";
 import { chromeStorageAdapter } from "../utils/storage-adapter";
 import { BRIDGE_PORT_NAME, type PortRequestFrame } from "./protocol";
 import { activeProxyClientIds, authNetworkClient, removeNetworkClient } from "./api";
@@ -301,6 +302,14 @@ async function connectInternal(location: ConnectLocation | undefined): Promise<C
 			error: "The extension is not set up with a network.",
 			code: "not_setup",
 		};
+	}
+	// Another extension that holds the browser's proxy setting with priority, or
+	// policy, keeps this one from setting it: refused before anything is
+	// provisioned, and never applied under it (utils/proxy-manager.ts).
+	const { control } = await proxyManager.readControl();
+	if (isControlRefusal(control)) {
+		const refusal = PROXY_CONTROL_REFUSALS[control];
+		return { ok: false, error: refusal.message, code: refusal.code };
 	}
 	const networkId = jwtNetworkId(jwt);
 
@@ -892,16 +901,31 @@ export function sessionForPopup(): Promise<BridgeSessionInfo> {
 	return getSessionInfo();
 }
 
+// The proxy as the popup shows it (utils/connection-manager.ts): whether the
+// browser sends through this extension's proxy, who holds the setting, and the
+// saved connect intent.
+export async function proxyViewForPopup(): Promise<ProxyView> {
+	const [state, reading, stored] = await Promise.all([
+		proxyManager.getActualProxyState(),
+		proxyManager.readControl(),
+		chrome.storage.local.get("proxy_enabled"),
+	]);
+	proxyManager.syncState(state);
+	return { enabled: state.enabled, control: reading.control, intent: Boolean(stored.proxy_enabled) };
+}
+
 // An older version kept a pool of hosted proxies behind a PAC script
 // (Chromium) or a listener (Firefox). On upgrade a connected pool is replaced
 // by the install's one client at the popup's last pick, and every pool client
 // is released. A failed connect leaves the pool as it is, for the next start.
+// Only this extension's own PAC script is its pool: another extension's
+// (getActualProxyState reports none) is never connected over.
 export async function migrateLegacyMultiIp(): Promise<void> {
 	const legacyClientIds = await storedMultiClientIds();
 	const stored = await chrome.storage.local.get(["proxy_enabled", MULTI_IP_SLOTS_KEY]);
 	const state = await proxyManager.getActualProxyState();
 	const poolConnected =
-		state.mode === "pac" ||
+		(state.enabled && state.mode === "pac") ||
 		(Boolean(stored.proxy_enabled) && typeof stored[MULTI_IP_SLOTS_KEY] === "string");
 	if (legacyClientIds.length === 0 && !poolConnected) return;
 

@@ -1,22 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ConnectionManager, type ConnectionStatus } from "./connection-manager";
+import {
+	ConnectionManager,
+	type BlockedProxy,
+	type ConnectResult,
+	type ConnectionStatus,
+	type OutOfBalanceAlert,
+} from "./connection-manager";
+import type { ProxyView } from "./proxy-control";
 import type { ConnectLocation } from "./sdk-types";
 
 interface UseConnectionManagerResult {
+	// "loading" until the background says how the proxy stands
 	status: ConnectionStatus;
 	error: string | null;
-	connect: (location?: ConnectLocation) => Promise<void>;
+	// the out-of-data alert, kept after a disconnect from it
+	outOfBalance: OutOfBalanceAlert | null;
+	// who keeps the proxy setting from the extension
+	blocked: BlockedProxy | null;
+	connect: (location?: ConnectLocation) => Promise<ConnectResult>;
 	disconnect: () => Promise<void>;
 	// logout: also removes the install's hosted proxy client
 	endSession: () => Promise<void>;
-	// the popup opened: `proxyEnabled` is whether the browser is set to the proxy
-	reattach: (proxyEnabled: boolean) => Promise<void>;
+	// the popup opened: `view` is the proxy as GET_VPN_STATE reports it, null
+	// when the background could not say
+	reattach: (view: ProxyView | boolean | null) => Promise<void>;
 	onProxyChange: (cb: (config: null) => void) => void;
 }
 
 export function useConnectionManager(): UseConnectionManagerResult {
-	const [status, setStatus] = useState<ConnectionStatus>("idle");
+	const [status, setStatus] = useState<ConnectionStatus>("loading");
 	const [error, setError] = useState<string | null>(null);
+	const [outOfBalance, setOutOfBalance] = useState<OutOfBalanceAlert | null>(null);
+	const [blocked, setBlocked] = useState<BlockedProxy | null>(null);
 
 	const proxyChangeCbRef = useRef<((config: null) => void) | null>(null);
 	const managerRef = useRef<ConnectionManager | null>(null);
@@ -32,6 +47,8 @@ export function useConnectionManager(): UseConnectionManagerResult {
 					proxyChangeCbRef.current?.(config);
 				},
 				onError: setError,
+				onOutOfBalance: setOutOfBalance,
+				onBlocked: setBlocked,
 			});
 		}
 		return managerRef.current;
@@ -45,7 +62,13 @@ export function useConnectionManager(): UseConnectionManagerResult {
 	}, []);
 
 	const connect = useCallback(
-		(location?: ConnectLocation) => getManager().connect(location),
+		(location?: ConnectLocation) => {
+			// a new manager starts from loading; a connect leaves it at once
+			const mgr = getManager();
+			setOutOfBalance(null);
+			setBlocked(null);
+			return mgr.connect(location);
+		},
 		[getManager],
 	);
 
@@ -58,11 +81,12 @@ export function useConnectionManager(): UseConnectionManagerResult {
 	const endSession = useCallback(async () => {
 		const mgr = getManager();
 		managerRef.current = null;
+		setOutOfBalance(null);
 		await mgr.endSession();
 	}, [getManager]);
 
 	const reattach = useCallback(
-		(proxyEnabled: boolean) => getManager().reattach(proxyEnabled),
+		(view: ProxyView | boolean | null) => getManager().reattach(view),
 		[getManager],
 	);
 
@@ -73,5 +97,5 @@ export function useConnectionManager(): UseConnectionManagerResult {
 		[],
 	);
 
-	return { status, error, connect, disconnect, endSession, reattach, onProxyChange };
+	return { status, error, outOfBalance, blocked, connect, disconnect, endSession, reattach, onProxyChange };
 }

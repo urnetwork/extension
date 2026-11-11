@@ -1,4 +1,5 @@
 import React from "react";
+import { getMessage } from "@/utils/i18n";
 import type { IpInfo } from "@/utils/ip-info";
 
 interface IpInfoBannerProps {
@@ -22,9 +23,9 @@ export const IpInfoBanner: React.FC<IpInfoBannerProps> = ({
 			style={{ background: "var(--color-surface-2)" }}
 		>
 			{loading && !ipInfo ? (
-				<span className="opacity-50 animate-pulse">Checking IP...</span>
+				<span className="opacity-50 animate-pulse">{getMessage("extension_ip_checking")}</span>
 			) : error && !ipInfo ? (
-				<span className="opacity-40">IP unavailable</span>
+				<span className="opacity-40">{getMessage("extension_ip_unavailable")}</span>
 			) : ipInfo ? (
 				<>
 					<span
