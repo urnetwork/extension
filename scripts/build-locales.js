@@ -33,11 +33,60 @@ async function resolveLoadAllKeys() {
 }
 const outputDir = path.join(__dirname, "../public/_locales");
 
-// Project-specific language mapping
-const langMap = {
-	jp: "ja",
+// The store's locale (BCP-47, keys/*.yaml) -> the _locales folder the browsers
+// load. Chrome loads only the locales it lists, with an underscore before the
+// region (developer.chrome.com/docs/extensions/reference/api/i18n#locales: "If
+// you use an unsupported locale, Google Chrome ignores it"), and Firefox wants
+// the same underscore form (MDN, WebExtensions Internationalization) and falls
+// back from a region to its language, then to default_locale ("en",
+// manifest.config.ts). A hyphenated folder, or one Chrome does not list, is
+// never loaded: until 2026-11-11 pt-BR, pt-PT, es-419, zh and zh-HK shipped
+// that way, and those readers saw English or another variant.
+// null: the store has the locale, and the extension ships no folder for it.
+const EXTENSION_LOCALE = {
 	en: "en",
+	ar: "ar",
+	cs: "cs",
+	de: "de",
+	el: "el",
+	es: "es",
+	"es-419": "es_419",
+	// Chrome has no es_MX: Mexico's Chrome reads es_419, and Firefox es-MX falls
+	// back to es
+	"es-MX": null,
+	fr: "fr",
+	he: "he",
+	hi: "hi",
+	id: "id",
+	it: "it",
+	ja: "ja",
+	ko: "ko",
+	nl: "nl",
+	pl: "pl",
+	// Chrome has no bare pt: Brazil reads pt_BR, Portugal pt_PT
+	pt: null,
+	"pt-BR": "pt_BR",
+	"pt-PT": "pt_PT",
+	ru: "ru",
+	sv: "sv",
+	sw: "sw",
+	th: "th",
+	uk: "uk",
+	vi: "vi",
+	// the store's zh is Simplified Chinese
+	zh: "zh_CN",
+	// the store's Traditional Chinese; Chrome's one Traditional locale is zh_TW
+	"zh-HK": "zh_TW",
 };
+
+function extensionLocale(storeLocale) {
+	if (!(storeLocale in EXTENSION_LOCALE)) {
+		throw new Error(
+			`build-locales: the store has locale ${storeLocale}, which has no _locales folder decided: add it to EXTENSION_LOCALE`,
+		);
+	}
+	return EXTENSION_LOCALE[storeLocale];
+}
 
 async function buildChromeLocales() {
 	const loadAllKeys = await resolveLoadAllKeys();
@@ -66,18 +115,26 @@ async function buildChromeLocales() {
 	});
 
 	// Write to Chrome format
+	const built = [];
+	const skipped = [];
 	Object.entries(messagesByLang).forEach(([lang, messages]) => {
-		const chromeLang = langMap[lang] || lang;
-		const langDir = path.join(outputDir, chromeLang);
+		const folder = extensionLocale(lang);
+		if (folder === null) {
+			skipped.push(lang);
+			return;
+		}
+		const langDir = path.join(outputDir, folder);
 		fs.mkdirSync(langDir, { recursive: true });
 		fs.writeFileSync(
 			path.join(langDir, "messages.json"),
 			JSON.stringify(messages, null, 2),
 		);
+		built.push(folder);
 	});
 
 	console.log(
-		`✅ Built Chrome locales for: ${Object.keys(messagesByLang).join(", ")}`,
+		`✅ Built Chrome locales for: ${built.join(", ")}` +
+			(skipped.length ? ` (no folder for the store's ${skipped.join(", ")})` : ""),
 	);
 }
 

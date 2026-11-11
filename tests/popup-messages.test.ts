@@ -74,7 +74,7 @@ describe("the popup's text", () => {
 		];
 		const english = catalog("en");
 		const untranslated: string[] = [];
-		for (const locale of ["de", "es", "fr", "ja", "ru", "zh", "ar"]) {
+		for (const locale of ["de", "es", "fr", "ja", "ru", "zh_CN", "ar"]) {
 			for (const key of keys) {
 				if (catalog(locale)[key]?.message === english[key]?.message) untranslated.push(`${locale}: ${key}`);
 			}
