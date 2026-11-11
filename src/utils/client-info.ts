@@ -8,7 +8,6 @@
 // The distribution follows the build target (vite.config.ts BROWSER_TARGET,
 // defined as __EXTENSION_BROWSER_TARGET__): the Firefox build, or the Chrome
 // build for the Chromium browsers' stores.
-/// <reference path="../env.d.ts" />
 import { ClientDistribution, clientInfoHeaders } from "@urnetwork/sdk/client";
 
 export const EXTENSION_DEVICE_TYPE = "web";

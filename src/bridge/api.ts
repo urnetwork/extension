@@ -4,6 +4,7 @@
 // directly with the stored by_jwt, passed in per call.
 import { isURNetworkApiError, type OpenAPI } from "@urnetwork/sdk/client";
 import { extensionApiClient } from "../utils/api-client";
+import type { BalanceReading } from "../utils/out-of-balance";
 import type { AuthNetworkClientArgs } from "../utils/sdk-types";
 
 export type BridgeProxyConfigResult = {
@@ -107,6 +108,27 @@ export async function activeProxyClientIds(byJwt: string): Promise<Set<string> |
 				.map((client) => client.client_id)
 				.filter((clientId): clientId is string => typeof clientId === "string" && clientId !== ""),
 		);
+	} catch {
+		return null;
+	}
+}
+
+// The network's data balance (GET /subscription/balance), or null when it did
+// not come back. Read when a health check fails, to tell an account with no
+// data left, whose proxy carries nothing until data is available again, from
+// a proxy that does not answer (utils/proxy-health.ts). Pro is what ur.io
+// counts as Pro (its AuthContext isPro): an in-window Pro balance, or the Pro
+// plan, whose wire name stays "supporter".
+export async function subscriptionBalance(byJwt: string): Promise<BalanceReading | null> {
+	try {
+		const result = await extensionApiClient().subscriptionBalance(undefined, { token: byJwt });
+		const balanceByteCount = Number(result?.balance_byte_count);
+		if (!Number.isFinite(balanceByteCount)) return null;
+		const pro =
+			(result.active_transfer_balances ?? []).some((balance) => balance?.pro === true) ||
+			(typeof result.current_subscription?.plan === "string" &&
+				result.current_subscription.plan.toLowerCase() === "supporter");
+		return { balanceByteCount, pro };
 	} catch {
 		return null;
 	}

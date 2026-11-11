@@ -22,6 +22,7 @@ import {
 	type FakePort,
 	type LiveSessionSeed,
 } from "./harness";
+import { SYSTEM_PROXY } from "../chrome-mock";
 
 describe("REFRESH_JWT", () => {
 	let h: BridgeHarness;
@@ -179,9 +180,9 @@ describe("SETUP vs REFRESH_JWT contrast", () => {
 
 		// identity replaced
 		expect(h.chrome.getStored("by_jwt")).toBe(newJwt);
-		// proxy torn down to direct
-		expect(h.chrome.proxySettingsSetCalls.length).toBeGreaterThan(0);
-		expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+		// proxy torn down: the setting released, the browser's own back
+		expect(h.chrome.proxySettingsClearCalls.length).toBeGreaterThan(0);
+		expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
 		// durable session state and renewal alarm gone
 		expect(h.chrome.getStored("bridge_session")).toBeUndefined();
 		expect(h.chrome.getStored("proxy_client_id")).toBeUndefined();

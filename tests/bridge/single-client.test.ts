@@ -16,6 +16,7 @@ import {
 	type BridgeHarness,
 	type FakePort,
 } from "./harness";
+import { SYSTEM_PROXY } from "../chrome-mock";
 
 const JWT = makeJwt({ network_id: NETWORK_ID, network_name: "testnet", user_id: "user-1" });
 
@@ -78,7 +79,7 @@ describe("one hosted proxy client per install", () => {
 		for (let i = 0; i < 3; i++) {
 			const off = await app.request("DISCONNECT");
 			expect(off).toMatchObject({ ok: true, data: { session: { connected: false } } });
-			expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+			expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
 			const on = await app.request("CONNECT");
 			expect(on).toMatchObject({ ok: true, data: { session: { connected: true, clientId: clientId(1) } } });
 			expect(h.chrome.proxyValue()).toMatchObject(fixedProxy(1));
@@ -157,7 +158,7 @@ describe("one hosted proxy client per install", () => {
 
 		expect(h.api.removeNetworkClient).toHaveBeenCalledWith(clientId(1), JWT);
 		expect(h.chrome.getStored("bridge_session")).toBeUndefined();
-		expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+		expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
 		await app.request("CONNECT");
 		expect(provisions()).toBe(2);
 	});

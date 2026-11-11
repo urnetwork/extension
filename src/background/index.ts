@@ -1,5 +1,5 @@
 import { proxyManager } from "../utils/proxy-manager";
-import { performHealthCheck } from "../utils/proxy-health";
+import { requestHealthCheck, type ProxyHealthTrigger } from "../utils/proxy-health";
 import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
 import { isAllowedOrigin } from "../utils/origins";
@@ -11,6 +11,7 @@ import {
 	initBridge,
 	migrateLegacyMultiIp,
 	notifySessionChanged,
+	proxyViewForPopup,
 } from "../bridge/background";
 import type { ConnectLocation } from "../utils/sdk-types";
 import { initDeviceRpcBridge } from "../bridge/device-rpc";
@@ -46,12 +47,29 @@ if (!isFirefox() && chrome.proxy?.onProxyError) {
 	});
 }
 
+// Chromium: another extension can take the proxy setting, or give it back,
+// while the popup is open; the popup shows who holds it
+// (utils/connection-manager.ts PROXY_CONTROL)
+if (!isFirefox() && chrome.proxy?.settings?.onChange) {
+	chrome.proxy.settings.onChange.addListener(() => {
+		proxyViewForPopup()
+			.then((view) => chrome.runtime.sendMessage({ type: "PROXY_CONTROL", view }))
+			.catch(() => {});
+	});
+}
+
 // ── Health check system ───────────────────────────────────────────────────────
 
-function triggerEarlyHealthCheck(): void {
-	performHealthCheck(notifySessionChanged).catch((err) => {
-		console.error("Health check failed:", err);
+// One check at a time, and a burst of proxy errors counts once
+// (utils/proxy-health.ts requestHealthCheck).
+function healthCheck(trigger: ProxyHealthTrigger): void {
+	requestHealthCheck(trigger, notifySessionChanged).catch((err) => {
+		console.error(`Health check (${trigger}) failed:`, err);
 	});
+}
+
+function triggerEarlyHealthCheck(): void {
+	healthCheck("proxy_error");
 }
 
 // Set up recurring health check alarm
@@ -59,11 +77,26 @@ chrome.alarms.create(HEALTH_ALARM_NAME, { periodInMinutes: 1 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
 	if (alarm.name === HEALTH_ALARM_NAME) {
-		performHealthCheck(notifySessionChanged).catch((err) => {
-			console.error("Scheduled health check failed:", err);
-		});
+		healthCheck("scheduled");
 	}
 });
+
+// what a failed popup request answers with: the error, its code, and the proxy
+// as it stands after the failure (a failed connect can leave the proxy set)
+async function popupFailure(error: unknown, code: unknown): Promise<Record<string, unknown>> {
+	return {
+		success: false,
+		error: typeof error === "string" ? error : undefined,
+		code: typeof code === "string" ? code : undefined,
+		view: await proxyViewForPopup().catch(() => undefined),
+	};
+}
+
+// a thrown error's message and code (utils/proxy-manager.ts ProxyControlError)
+function thrownFailure(err: unknown): Promise<Record<string, unknown>> {
+	const failure = err as { message?: unknown; code?: unknown } | null;
+	return popupFailure(failure?.message, failure?.code);
+}
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 
@@ -239,39 +272,41 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 			message.location && typeof message.location === "object"
 				? (message.location as ConnectLocation)
 				: undefined;
+		// a failure answers with the proxy as it stands: a location change that
+		// failed can leave the install's previous proxy set
 		connectFromPopup(location)
 			.then((outcome) =>
-				sendResponse(
-					outcome.ok
-						? { success: true, session: outcome.session }
-						: { success: false, error: outcome.error, code: outcome.code },
-				),
+				outcome.ok
+					? { success: true, session: outcome.session }
+					: popupFailure(outcome.error, outcome.code),
 			)
 			.catch((err: Error) => {
 				console.error("Failed to connect:", err);
-				sendResponse({ success: false, error: err.message });
-			});
+				return thrownFailure(err);
+			})
+			.then(sendResponse);
 		return true;
 	}
 
 	if (message.type === "POPUP_DISCONNECT" || message.type === "POPUP_END_SESSION") {
 		const end = message.type === "POPUP_END_SESSION";
 		(end ? endFromPopup() : disconnectFromPopup())
-			.then((session) => sendResponse({ success: true, session }))
+			.then(async (session) => ({
+				success: true,
+				session,
+				view: await proxyViewForPopup().catch(() => undefined),
+			}))
 			.catch((err: Error) => {
 				console.error("Failed to disconnect:", err);
-				sendResponse({ success: false, error: err.message });
-			});
+				return thrownFailure(err);
+			})
+			.then(sendResponse);
 		return true;
 	}
 
 	if (message.type === "GET_VPN_STATE") {
-		proxyManager
-			.getActualProxyState()
-			.then((state) => {
-				proxyManager.syncState(state);
-				sendResponse({ success: true, state });
-			})
+		proxyViewForPopup()
+			.then((view) => sendResponse({ success: true, state: proxyManager.getState(), view }))
 			.catch((err: Error) => {
 				console.error("Failed to get VPN state:", err);
 				sendResponse({ success: true, state: proxyManager.getState() });

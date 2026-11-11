@@ -4,8 +4,8 @@
 // POPUP_* call) and the health check, with the chrome mock as the browser.
 //
 // - kill switch off (the default): a proxy that fails three checks in a row is
-//   taken off and the browser goes direct; the client stays saved and the
-//   next connect applies it again with no auth-client call.
+//   taken off, releasing the browser's proxy setting; the client stays saved
+//   and the next connect applies it again with no auth-client call.
 // - kill switch on: the proxy stays set (fail closed).
 // - a popup location change with no ur.io tab replaces the client, removing
 //   the old one before the connect answers; with a tab attached the tab moves
@@ -21,6 +21,8 @@ import {
 	type BridgeHarness,
 } from "./harness";
 import type { ConnectLocation } from "../../src/utils/sdk-types";
+import { SYSTEM_PROXY } from "../chrome-mock";
+import { minuteSchedule, type MinuteSchedule } from "../health-schedule";
 
 const JWT = makeJwt({ network_id: NETWORK_ID, network_name: "testnet", user_id: "user-1" });
 
@@ -54,6 +56,7 @@ type HealthModule = typeof import("../../src/utils/proxy-health");
 describe("the one client's paths", () => {
 	let h: BridgeHarness;
 	let health: HealthModule;
+	let schedule: MinuteSchedule;
 
 	const provisions = () => h.api.authNetworkClient.mock.calls.length;
 	const popupMessages = () =>
@@ -63,6 +66,7 @@ describe("the one client's paths", () => {
 		h = await createBridgeHarness();
 		// the same module registry as the bridge the harness loaded
 		health = await import("../../src/utils/proxy-health");
+		schedule = minuteSchedule(health);
 		h.chrome.seedStorage({ by_jwt: JWT, network_name: "testnet" });
 		let next = 1;
 		h.api.authNetworkClient.mockImplementation(async () => provisioned(next++));
@@ -73,17 +77,19 @@ describe("the one client's paths", () => {
 	});
 
 	describe("health check and kill switch", () => {
-		it("kill switch off: three failed checks go direct and the next connect reuses the client", async () => {
+		it("kill switch off: three failed checks release the setting and the next connect reuses the client", async () => {
 			await h.bridge.connectFromPopup(undefined);
 			// tests/setup.ts fails every fetch: the proxy does not answer
 
-			expect(await health.performHealthCheck()).toBe("failing");
-			expect(await health.performHealthCheck()).toBe("failing");
+			expect(await schedule.check()).toBe("failing");
+			expect(await schedule.check()).toBe("failing");
 			expect(h.chrome.proxyValue()).toMatchObject(fixedProxy(1));
 			const notify = vi.fn();
-			expect(await health.performHealthCheck(notify)).toBe("fell_back");
+			expect(await schedule.check(notify)).toBe("fell_back");
 
-			expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+			// released: the browser's own setting is back, not one "direct" of the extension's
+			expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
+			expect(h.chrome.ownProxyValue()).toBeNull();
 			expect(notify).toHaveBeenCalledWith("health");
 			expect(popupMessages()).toEqual([{ type: "PROXY_HEALTH", outcome: "fell_back" }]);
 			// the client stays saved
@@ -96,7 +102,7 @@ describe("the one client's paths", () => {
 			expect(provisions()).toBe(1);
 			expect(h.chrome.proxyValue()).toMatchObject(fixedProxy(1));
 			// the connect started the count afresh: one failure is not a fallback yet
-			expect(await health.performHealthCheck()).toBe("failing");
+			expect(await schedule.check()).toBe("failing");
 			expect(h.chrome.proxyValue()).toMatchObject(fixedProxy(1));
 		});
 
@@ -105,7 +111,7 @@ describe("the one client's paths", () => {
 			await h.bridge.connectFromPopup(undefined);
 
 			const outcomes = [];
-			for (let i = 0; i < 5; i++) outcomes.push(await health.performHealthCheck());
+			for (let i = 0; i < 5; i++) outcomes.push(await schedule.check());
 
 			expect(outcomes).toEqual(["failing", "failing", "unreachable", "unreachable", "unreachable"]);
 			expect(h.chrome.proxyValue()).toMatchObject(fixedProxy(1));
@@ -115,15 +121,15 @@ describe("the one client's paths", () => {
 		it("a passing check starts the count afresh", async () => {
 			await h.bridge.connectFromPopup(undefined);
 
-			expect(await health.performHealthCheck()).toBe("failing");
-			expect(await health.performHealthCheck()).toBe("failing");
+			expect(await schedule.check()).toBe("failing");
+			expect(await schedule.check()).toBe("failing");
 			vi.stubGlobal("fetch", async () => ({ ok: true }));
-			expect(await health.performHealthCheck()).toBe("healthy");
+			expect(await schedule.check()).toBe("healthy");
 			vi.stubGlobal("fetch", async () => {
 				throw new Error("unreachable");
 			});
-			expect(await health.performHealthCheck()).toBe("failing");
-			expect(await health.performHealthCheck()).toBe("failing");
+			expect(await schedule.check()).toBe("failing");
+			expect(await schedule.check()).toBe("failing");
 
 			expect(h.chrome.proxyValue()).toMatchObject(fixedProxy(1));
 			expect(popupMessages()).toEqual([{ type: "PROXY_HEALTH", outcome: "healthy" }]);
@@ -133,8 +139,8 @@ describe("the one client's paths", () => {
 			await h.bridge.connectFromPopup(undefined);
 			await h.bridge.disconnectFromPopup();
 
-			expect(await health.performHealthCheck()).toBe("idle");
-			expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+			expect(await schedule.check()).toBe("idle");
+			expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
 		});
 	});
 
@@ -183,7 +189,7 @@ describe("the one client's paths", () => {
 		const session = await h.bridge.endFromPopup();
 
 		expect(session.connected).toBe(false);
-		expect(h.chrome.proxyValue()).toEqual({ mode: "direct" });
+		expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
 		expect(h.api.removeNetworkClient).toHaveBeenCalledWith(clientId(1), JWT);
 		expect(h.chrome.getStored("bridge_session")).toBeUndefined();
 		await h.bridge.connectFromPopup(undefined);

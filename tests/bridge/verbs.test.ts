@@ -42,6 +42,13 @@ describe("bridge verb dispatch", () => {
 		});
 	});
 
+	// ur.io's out-of-data notice says what the browser does meanwhile: an
+	// extension that holds the traffic out of data says so (owner, 2026-11-11)
+	it("GET_STATUS says out of data holds the browser's traffic", async () => {
+		const res = await app.request("GET_STATUS");
+		expect(res.data).toMatchObject({ outOfDataHeld: true });
+	});
+
 	it("GET_STATUS preserves the device session when Chrome lowercases the proxy hostname", async () => {
 		const { record } = await h.seedLiveSession();
 		const signedProxyId = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
