@@ -1,9 +1,9 @@
 import type { AuthNetworkClientArgs, ConnectLocation, PerformanceProfile } from "./sdk-types";
 
-// The device's IANA time zone and BCP 47 locale ride on every auth-client
-// call: the onboarding campaign sends in the user's local morning and picks
-// the email's language from them (mmm/onboarding/PLAN.md). Optional on the
-// wire.
+// The device's IANA time zone, BCP 47 locale and ordered languages ride on
+// every auth-client call: the campaign emails are placed in the reader's day
+// and written in their language (server controller/mail_context.go).
+// Optional on the wire.
 
 export function deviceTimeZone(): string {
 	try {
@@ -18,6 +18,18 @@ export function deviceLocale(): string {
 		return navigator.language || "";
 	} catch {
 		return "";
+	}
+}
+
+// The browser's languages, most preferred first (navigator.languages; Firefox
+// with resistFingerprinting lists only one). The whole list, so a reader who
+// lists Catalan, then Spanish, reads the Spanish emails.
+export function deviceLocales(): string[] {
+	try {
+		const languages = Array.isArray(navigator.languages) ? navigator.languages : [navigator.language];
+		return languages.filter((language) => typeof language === "string" && language !== "").slice(0, 8);
+	} catch {
+		return [];
 	}
 }
 
@@ -49,6 +61,7 @@ export function buildAuthParams(
 		device_spec: "",
 		time_zone: deviceTimeZone(),
 		locale: deviceLocale(),
+		locales: deviceLocales(),
 		proxy_config: {
 			lock_caller_ip: false,
 			lock_ip_list: [],
