@@ -299,6 +299,10 @@
     "message": "비밀번호는 최소 12자 이상이어야 합니다",
     "description": "Hint for password input length requirements."
   },
+  "plan_account_name": {
+    "message": "계정: {name}",
+    "description": "Shown with the plan (Free or Pro) on the Account screen, the plan card and the subscription screen, and in the purchase confirmation: the account (network) the plan belongs to. The argument is the signed-in network's own name. Customers with several accounts could not tell which one held Pro (support inbox 6546)."
+  },
   "promoted": {
     "message": "홍보됨",
     "description": "VPN providers list option for promoted providers"
@@ -352,8 +356,8 @@
     "description": "App connect screen and macOS menu bar: status while a connect is in progress, before the connection is up."
   },
   "site_data_limit_pro": {
-    "message": "이번 달 Pro 데이터를 모두 사용했습니다. 다음 달 1일(UTC)에 갱신되며, 데이터 팩으로 지금 더 추가할 수 있습니다.",
-    "description": "ur.io Connect screen, out-of-balance notice for a Pro account whose plan data is used up (title: Data limit reached). Pro's data is granted at 00:00 UTC on the 1st of each month; a data pack (sold on ur.io, the Buy data button beside this line) adds data at once. Keep Pro and UTC as is."
+    "message": "이번 주기의 Pro 데이터를 모두 사용했습니다. 무료 일일 데이터는 계속 매일 00:00 UTC에 제공되고, Pro 데이터는 다음 구독 주기가 시작될 때 갱신되며, 데이터 팩으로 지금 더 추가할 수 있습니다.",
+    "description": "ur.io Connect screen and the browser extension popup: out-of-balance notice for a Pro account whose plan data is used up (title: Data limit reached). Pro's 10 TiB is granted at the start of each of the network's own subscription cycles, not on a fixed day of the month. Every account, Pro included, also gets the free daily data at 00:00 UTC, which a Pro account uses once its plan data is used up. A data pack (sold on ur.io, the Buy data button beside this line) adds data at once. Keep Pro and 00:00 UTC as is."
   },
   "something_went_wrong": {
     "message": "문제가 발생했습니다.",
