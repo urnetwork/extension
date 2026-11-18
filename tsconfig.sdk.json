@@ -33,5 +33,6 @@
 		"skipLibCheck": true,
 		"typeRoots": ["../sdk/js/node_modules/@types"]
 	},
-	"include": ["../sdk/js/src/**/*"]
+	// Composite projects require an explicit JSON include for imported data.
+	"include": ["../sdk/js/src/**/*", "../sdk/js/src/**/*.json"]
 }
