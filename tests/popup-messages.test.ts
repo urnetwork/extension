@@ -106,4 +106,21 @@ describe("the popup's text", () => {
 		}
 		expect(found).toEqual([]);
 	});
+
+	// The extension signs in with a session of its own (owner decision
+	// 2026-11-18), so its code sign-in can meet the account's cap of active
+	// sessions: the line that says so (tagged web in localizations c63dded) is
+	// in every catalog, translated, and the popup no longer shows the server's
+	// English for a refusal.
+	it("the session cap's refusal of a code sign-in is a key, translated", () => {
+		const english = catalog("en").sessions_limit_reached_sign_in?.message;
+		expect(english).toMatch(/Account > Sessions/);
+		const untranslated: string[] = [];
+		for (const locale of ["de", "es", "fr", "ja", "ru", "zh_CN", "ar"]) {
+			if (catalog(locale).sessions_limit_reached_sign_in?.message === english) untranslated.push(locale);
+		}
+		expect(untranslated).toEqual([]);
+		const popup = readFileSync(path.join(ROOT, "src/popup/components/AuthInitial.tsx"), "utf8");
+		expect(popup).not.toMatch(/error\.message/);
+	});
 });

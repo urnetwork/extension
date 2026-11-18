@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { UrButton, UrInput, UrText } from "@urnetwork/elements/react";
 import { getMessage } from "@/utils/i18n";
-import { useAuth, useAuthCodeLogin } from "@urnetwork/sdk/react";
+import { useAuth } from "@urnetwork/sdk/react";
+import { codeSignInFailure, codeSignInFailureText } from "@/utils/code-sign-in";
+import { useCodeSignIn } from "@/utils/use-code-sign-in";
 
 interface JWTReceivedMessage {
 	type: "JWT_RECEIVED";
@@ -9,11 +11,14 @@ interface JWTReceivedMessage {
 	networkName?: string;
 }
 
+// The popup signed out. A code, typed or from SSO, signs the extension in
+// with a session of its own (utils/code-sign-in.ts).
 const AuthInitial: React.FC = () => {
 	const [authCode, setAuthCode] = useState("");
 	const [ssoLoading, setSsoLoading] = useState(false);
 	const { setAuth } = useAuth();
-	const { authCodeLogin, loading, error } = useAuthCodeLogin();
+	const { signIn, loading, failure, setFailure } = useCodeSignIn();
+	const failureText = codeSignInFailureText(failure);
 
 	useEffect(() => {
 		const messageListener = (message: JWTReceivedMessage) => {
@@ -28,21 +33,21 @@ const AuthInitial: React.FC = () => {
 	const handleLogin = async (e?: React.FormEvent) => {
 		if (e) e.preventDefault();
 		if (!authCode.trim()) return;
-		try {
-			const result = await authCodeLogin(authCode.trim());
-			if (result.error) return;
-			if (result.by_jwt) setAuth(result.by_jwt);
-		} catch (err) {
-			console.error("Login failed:", err);
-		}
+		await signIn(authCode.trim());
 	};
 
 	const handleSsoLogin = async () => {
 		setSsoLoading(true);
+		setFailure(null);
 		try {
 			const response = await chrome.runtime.sendMessage({ type: "START_SSO" });
 			if (!response?.success) {
 				console.error("SSO failed:", response?.error);
+				// the session cap's refusal says what to do; a closed or failed
+				// SSO window says nothing, as before
+				if (codeSignInFailure(response?.code) === "session_limit_reached") {
+					setFailure("session_limit_reached");
+				}
 			}
 		} catch (err) {
 			console.error("Failed to initiate SSO:", err);
@@ -126,8 +131,8 @@ const AuthInitial: React.FC = () => {
 							placeholder={getMessage("auth_code_input_placeholder")}
 							value={authCode}
 							onInput={(e) => setAuthCode(e.detail.value)}
-							invalid={!!error}
-							hint={error ? getMessage("auth_code_input_invalid") : undefined}
+							invalid={failure === "refused"}
+							hint={failure === "refused" ? getMessage("auth_code_input_invalid") : undefined}
 							type="password"
 						/>
 					</div>
@@ -149,10 +154,10 @@ const AuthInitial: React.FC = () => {
 					{renderInstructionsWithLink(getMessage("access_auth_code_instructions"))}
 				</p>
 
-				{error && (
+				{failureText && (
 					<div className="mt-3">
 						<UrText variant="small" className="text-ur-coral">
-							{error.message}
+							{failureText}
 						</UrText>
 					</div>
 				)}

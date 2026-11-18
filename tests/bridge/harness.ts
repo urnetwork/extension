@@ -14,9 +14,12 @@
 // restarts the background service.
 //
 // The api module (src/bridge/api.ts) is replaced with vi.fn()s at the module
-// boundary: it is the only network surface the bridge has, and mocking it both
+// boundary: it is the bridge's provisioning surface, and mocking it both
 // keeps the suite offline and lets tests assert provisioning/release calls —
-// including that REFRESH_JWT makes none at all.
+// including that REFRESH_JWT makes none at all. The extension's own sign-in
+// (src/utils/own-sign-in.ts: code-login, network-refresh, revoke-session) goes
+// through the real sdk client, whose fetch tests/setup.ts fails unless a test
+// serves it (tests/bridge/fake-api.ts).
 import { vi } from "vitest";
 import { installChromeMock, type ChromeMock } from "../chrome-mock";
 import type * as BackgroundModule from "../../src/bridge/background";

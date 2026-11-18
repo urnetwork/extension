@@ -15,10 +15,11 @@ describe("bridge verb dispatch", () => {
 		app = h.connect();
 	});
 
-	it("PING answers with the extension version", async () => {
+	it("PING answers with the extension version and what its bridge does", async () => {
 		const res = await app.request("PING");
 		expect(res.ok).toBe(true);
-		expect(res.data).toEqual({ version: "0.0.0-test" });
+		// the page keys off the capabilities: an older extension has none
+		expect(res.data).toEqual({ version: "0.0.0-test", setupAuthCode: true, renewSession: true });
 	});
 
 	it("an unknown verb is an explicit error frame, not silence", async () => {

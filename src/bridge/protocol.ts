@@ -25,6 +25,20 @@
 
 export const BRIDGE_PORT_NAME = "urnetwork-app-bridge";
 
+// What this extension's bridge does beyond the verbs every version has, sent
+// in the answer to PING (content.ts answers it itself, background.ts when a
+// PING reaches the service). An older extension's answer lacks them, and the
+// page keys off them:
+//   setupAuthCode — SETUP takes {authCode, networkId, networkName}: the
+//                   extension redeems a one-use sign-in code the page created
+//                   for a sign-in of its own (owner decision 2026-11-18)
+//   renewSession  — RENEW_SESSION renews the extension's own sign-in, and
+//                   REFRESH_JWT no longer adopts the page's token
+export const BRIDGE_CAPABILITIES = Object.freeze({
+	setupAuthCode: true,
+	renewSession: true,
+});
+
 // Dedicated high-volume channel for opaque SDK device-rpc frames. Keeping it
 // separate from BRIDGE_PORT_NAME prevents control responses/events from being
 // queued behind binary traffic and lets either channel reconnect independently.

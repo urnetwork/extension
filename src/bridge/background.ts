@@ -8,15 +8,45 @@
 // rpc frames use the dedicated service in device-rpc.ts. Secrets never cross
 // either bridge into the page.
 //
-// Verbs: PING, GET_STATUS, GET_USER, GET_SESSION, SETUP, REFRESH_JWT, CONNECT,
-// DISCONNECT, GET_KILL_SWITCH, SET_KILL_SWITCH, GET_GEO_SYNC,
-// SET_PROVIDER_LOCATIONS, SET_LOCATION, SET_PERFORMANCE_PROFILE.
+// Verbs: PING, GET_STATUS, GET_USER, GET_SESSION, SETUP, RENEW_SESSION,
+// REFRESH_JWT, CONNECT, DISCONNECT, GET_KILL_SWITCH, SET_KILL_SWITCH,
+// GET_GEO_SYNC, SET_PROVIDER_LOCATIONS, SET_LOCATION, SET_PERFORMANCE_PROFILE.
 // Events (broadcast to every connected ur.io tab): SESSION_CHANGED,
 // USER_CHANGED, GEO_SYNC_CHANGED, APPLY_LOCATION (a popup pick with the time
 // it was made, see handleExtensionLocationChange). This control channel
 // carries no device-state model; the dedicated device-rpc channel carries
 // opaque bytes and the app subscribes to SDK listeners natively. Wire shapes
 // live in protocol.ts.
+//
+// The extension's own sign-in (owner decision 2026-11-18, utils/own-sign-in.ts):
+// the extension signs in with a session of its own, which the account's
+// Sessions list shows apart and a sign-out on ur.io leaves signed in. PING
+// answers what this version's bridge does (protocol.ts BRIDGE_CAPABILITIES:
+// setupAuthCode, renewSession), and the page keys off it.
+//   SETUP {authCode, networkId, networkName} — a one-use sign-in code the page
+//     created with its own sign-in. The extension redeems it (one request id;
+//     the same code and id sent once more only when the answer was lost) and
+//     checks the sign-in (not a guest's, of networkId when given) before
+//     anything changes; only then is the old identity torn down and the new
+//     one stored. A failure leaves the old identity as it was and throws a
+//     code the page branches on: auth_code_refused, session_limit_reached or
+//     wrong_network. An older page's SETUP {jwt} still hands over the page's
+//     own token, which shares the page's session.
+//   RENEW_SESSION — renews the extension's own token now and answers {status:
+//     renewed | no_session | signed_out}. signed_out: the server rejected the
+//     renewal (the sign-in was revoked in Sessions, or expired), and the
+//     extension signed out locally, as its popup's sign-out does.
+//   REFRESH_JWT {byJwt} — an older page's push after a payment. The page's
+//     token is never adopted: the extension renews its own instead and
+//     answers refreshed (no_session and wrong_network as before), so the page
+//     does not fall back to SETUP {jwt}.
+// The extension renews its token itself on an alarm (OWN_SESSION_RENEW_ALARM)
+// at networkTokenRenewalTime of the token, set whenever by_jwt changes and at
+// service worker start; a renewal that did not come back is tried again after
+// renewRetryMs. Its popup's sign-out, and a setup that replaces its sign-in,
+// sign its own session out on the server before its token is forgotten, best
+// effort and bounded, so a signed-out extension does not stay listed as a live
+// session.
 //
 // The one hosted proxy client (owner, 2026-11-05: a single client per
 // extension). The first connect provisions one hosted proxy client
@@ -65,10 +95,23 @@
 import { proxyManager, type ProxyConfig } from "../utils/proxy-manager";
 import { PROXY_CONTROL_REFUSALS, isControlRefusal, type ProxyView } from "../utils/proxy-control";
 import { chromeStorageAdapter } from "../utils/storage-adapter";
-import { BRIDGE_PORT_NAME, type PortRequestFrame } from "./protocol";
+import { BRIDGE_CAPABILITIES, BRIDGE_PORT_NAME, type PortRequestFrame } from "./protocol";
 import { activeProxyClientIds, authNetworkClient, removeNetworkClient } from "./api";
 import { buildAuthParams } from "../utils/auth-params";
 import { parseJwtClaims } from "../utils/jwt-claims";
+import { networkTokenRenewalTime, renewNetworkToken } from "@urnetwork/sdk/client";
+import { extensionApiClient } from "../utils/api-client";
+import {
+	OWN_SESSION_RENEW_ALARM,
+	SIGNED_OUT,
+	STORAGE_KEY_OWN_SESSION_ID,
+	defaultOwnSignInSettings,
+	redeemOwnSignIn,
+	renewalDraw,
+	revokeSession,
+	sessionIdOf,
+} from "../utils/own-sign-in";
+import type { CodeSignInAnswer } from "../utils/code-sign-in";
 import {
 	loadBridgeSession,
 	saveBridgeSession,
@@ -115,6 +158,8 @@ const MULTI_IP_SLOTS_KEY = "multi_ip_slots";
 // the popup's displayed pick (popup/components/ConnectScreen.tsx), stored as
 // JSON by the popup and as an object by persistLocation
 const STORAGE_KEY_SELECTED_LOCATION = "selected_connect_location";
+
+const ownSignInSettings = defaultOwnSignInSettings();
 
 export type BridgeUser = {
 	networkId: string | null;
@@ -584,7 +629,14 @@ async function endInternal(reason: string, jwtOverride?: string | null): Promise
 	return session;
 }
 
-async function setupInternal(jwt: string, networkName?: string): Promise<{ user: BridgeUser }> {
+// Replaces the extension's identity with `jwt`: `own` for a sign-in the
+// extension redeemed itself (its session is marked, STORAGE_KEY_OWN_SESSION_ID),
+// else a token a page handed over, whose session is the page's.
+async function setupInternal(
+	jwt: string,
+	networkName: string | undefined,
+	own: boolean,
+): Promise<{ user: BridgeUser }> {
 	const claims = parseJwtClaims(jwt);
 	if (!claims) {
 		throw new Error("Invalid token");
@@ -597,12 +649,23 @@ async function setupInternal(jwt: string, networkName?: string): Promise<{ user:
 	// tear down any existing session under the OLD identity before replacing it
 	const oldJwt = await getJwt();
 	await endInternal("setup", oldJwt);
+	// the old sign-in is over: its own session is signed out on the server,
+	// unless it is the one being set up again
+	if (oldJwt && sessionIdOf(oldJwt) !== sessionIdOf(jwt)) {
+		await revokeOwnSessionInternal(oldJwt);
+	}
 
 	const storageData: Record<string, string> = { by_jwt: jwt };
 	const name =
 		networkName ?? (typeof claims.network_name === "string" ? claims.network_name : undefined);
 	if (name) {
 		storageData.network_name = name;
+	}
+	const ownSessionId = own ? sessionIdOf(jwt) : null;
+	if (ownSessionId) {
+		storageData[STORAGE_KEY_OWN_SESSION_ID] = ownSessionId;
+	} else {
+		await chrome.storage.local.remove(STORAGE_KEY_OWN_SESSION_ID);
 	}
 	await chrome.storage.local.set(storageData);
 
@@ -616,25 +679,82 @@ async function setupInternal(jwt: string, networkName?: string): Promise<{ user:
 	return { user };
 }
 
-// In-place jwt swap for the SAME network identity — the non-disruptive
-// counterpart to SETUP. After a payment/upgrade the app holds a fresh jwt with
-// a new entitlement claim; the extension only needs to start using it. Nothing
-// here requires a reconnect: the live proxy authenticates with the signed
-// proxy id (not the jwt), and every jwt consumer — connectInternal, the
-// releases, the popup's api calls — reads `by_jwt` from storage at call time.
-// So swapping storage makes api calls and the next provision use the new jwt
-// immediately while the proxy session keeps running untouched.
+// SETUP with a sign-in code: the code is redeemed for a sign-in of the
+// extension's own and checked before anything changes (utils/own-sign-in.ts);
+// only then is the old identity torn down and the new one stored. A failure
+// leaves the old identity as it was and rejects with the code the page
+// branches on. The redemption waits on the network outside the serialized
+// operations; the swap is serialized.
+async function setupWithCode(
+	authCode: string,
+	networkId: string | undefined,
+	networkName: string | undefined,
+): Promise<{ user: BridgeUser; jwt: string }> {
+	const jwt = await redeemOwnSignIn(extensionApiClient(), authCode, networkId, ownSignInSettings);
+	const { user } = await serialize(() => setupInternal(jwt, networkName, true));
+	return { user, jwt };
+}
+
+type RenewStatus = "renewed" | "no_session" | "signed_out";
+
+// Renews the extension's own token now (POST /auth/network-refresh with that
+// token): a fresh token of the same session, with the network's claims as
+// they stand (a payment's Pro). Run serialized. A rejection is the server
+// ending the sign-in, and the extension signs out locally. Rejects when the
+// renewal did not come back (no answer, a server error): the token stays.
+// Nothing reconnects: the live proxy authenticates with its signed proxy id,
+// and every token consumer reads `by_jwt` at call time.
+async function renewInternal(): Promise<RenewStatus> {
+	const jwt = await getJwt();
+	if (!jwt) {
+		return "no_session";
+	}
+	const renewal = await renewNetworkToken(extensionApiClient(), jwt);
+	// the popup can sign out, or in, while the renewal is out: the answer is
+	// about a token the extension no longer holds, and the one it holds now
+	// is left as it is
+	const current = await getJwt();
+	if (current !== jwt) {
+		return current ? "renewed" : "no_session";
+	}
+	if (renewal.kind === "rejected") {
+		await endSignInInternal();
+		return "signed_out";
+	}
+
+	const storageData: Record<string, string> = { by_jwt: renewal.byJwt };
+	const name = parseJwtClaims(renewal.byJwt)?.network_name;
+	if (typeof name === "string" && name) {
+		storageData.network_name = name;
+	}
+	await chrome.storage.local.set(storageData);
+	// keep the popup in sync (same signal SETUP sends); app tabs get
+	// USER_CHANGED from the storage.onChanged listener
+	chrome.runtime
+		.sendMessage({ type: "JWT_RECEIVED", jwt: renewal.byJwt, networkName: storageData.network_name })
+		.catch(() => {});
+	await scheduleOwnSessionRenewal(renewal.byJwt);
+	return "renewed";
+}
+
+// An older page's push of its fresh token after a payment or an upgrade
+// (REFRESH_JWT). Adopting it would share the page's session again, so the
+// extension renews its own token instead, which carries the same new claims,
+// and answers refreshed: the page then does not fall back to SETUP {jwt}. A
+// renewal that did not come back answers refreshed too; the token stays, and
+// its alarm renews it later.
 //
 // Statuses (returned as data, not thrown, so the page can branch):
-//   refreshed     — jwt swapped in place
-//   no_session    — extension has no stored identity; nothing to refresh
-//   wrong_network — jwt belongs to a different network than the stored one;
-//                   that is an account switch, which must go through SETUP's
-//                   atomic teardown, so the page falls back to it
+//   refreshed     — the extension renewed its own token, or will
+//   no_session    — no stored identity, or the renewal found the sign-in
+//                   ended and the extension signed out
+//   wrong_network — the pushed token is another network's than the stored
+//                   one; that is an account switch, which must go through
+//                   SETUP's atomic teardown, so the page falls back to it
 async function refreshJwtInternal(
-	jwt: string,
+	pushedJwt: string,
 ): Promise<{ status: "refreshed" | "no_session" | "wrong_network"; user?: BridgeUser }> {
-	const claims = parseJwtClaims(jwt);
+	const claims = parseJwtClaims(pushedJwt);
 	if (!claims) {
 		throw new Error("Invalid token");
 	}
@@ -643,33 +763,112 @@ async function refreshJwtInternal(
 		throw new Error("Guest sessions cannot refresh the extension.");
 	}
 
-	const oldJwt = await getJwt();
-	if (!oldJwt) {
+	const jwt = await getJwt();
+	if (!jwt) {
 		return { status: "no_session" };
 	}
-	const oldClaims = parseJwtClaims(oldJwt);
 	if (
 		typeof claims.network_id !== "string" ||
 		!claims.network_id ||
-		oldClaims?.network_id !== claims.network_id
+		jwtNetworkId(jwt) !== claims.network_id
 	) {
 		return { status: "wrong_network" };
 	}
 
-	const storageData: Record<string, string> = { by_jwt: jwt };
-	const name = typeof claims.network_name === "string" ? claims.network_name : undefined;
-	if (name) {
-		storageData.network_name = name;
+	try {
+		if ((await renewInternal()) !== "renewed") {
+			return { status: "no_session" };
+		}
+	} catch {
+		// no answer: the token stays, and its renewal alarm tries again
 	}
-	await chrome.storage.local.set(storageData);
-
-	// keep the popup in sync (same signal SETUP and the external SET_JWT send);
-	// app tabs get USER_CHANGED from the storage.onChanged listener
-	chrome.runtime
-		.sendMessage({ type: "JWT_RECEIVED", jwt, networkName: name })
-		.catch(() => {});
-
 	return { status: "refreshed", user: await getUser() };
+}
+
+// The server ended the extension's sign-in (a renewal rejected: revoked in the
+// account's Sessions, signed out, expired). Signed out locally the way the
+// popup's own sign-out does (ConnectScreen handleLogout): the install's client
+// goes with the identity (endInternal), then the identity, its network name
+// and the popup's location pick. The ended token can release nothing, so the
+// client stays pending for the next sign-in's pass (utils/client-release.ts).
+// Nothing is signed out on the server, which ended the session itself.
+async function endSignInInternal(): Promise<void> {
+	await endInternal("signed_out", null);
+	await chrome.storage.local.remove([
+		"by_jwt",
+		"network_name",
+		STORAGE_KEY_OWN_SESSION_ID,
+		STORAGE_KEY_SELECTED_LOCATION,
+	]);
+	await chrome.alarms.clear(OWN_SESSION_RENEW_ALARM);
+	// an open popup goes back to its sign-in (utils/code-sign-in.ts onSignedOut)
+	chrome.runtime.sendMessage({ type: SIGNED_OUT }).catch(() => {});
+	broadcast("USER_CHANGED", { user: null });
+}
+
+// Signs the extension's own session out on the server (utils/own-sign-in.ts
+// revokeSession): best effort, bounded, never failing the local sign-out. Only
+// the session the extension signed in itself: a token a page handed over is
+// the page's session, and a token without a session_id cannot be signed out
+// by id.
+async function revokeOwnSessionInternal(jwt: string | null): Promise<void> {
+	const sessionId = jwt ? sessionIdOf(jwt) : null;
+	if (!jwt || !sessionId) {
+		return;
+	}
+	const stored = await chrome.storage.local.get(STORAGE_KEY_OWN_SESSION_ID);
+	if (stored[STORAGE_KEY_OWN_SESSION_ID] !== sessionId) {
+		return;
+	}
+	await revokeSession(extensionApiClient(), jwt, sessionId, ownSignInSettings);
+}
+
+// Sets the renewal alarm of the extension's own sign-in at the point of
+// `jwt`'s lifetime the sdk renews at (networkTokenRenewalTime: between 40% and
+// 50% of it, drawn at random; now for a token past it or without an
+// expiration), or clears it with no token.
+async function scheduleOwnSessionRenewal(jwt: string | null): Promise<void> {
+	if (!jwt) {
+		await chrome.alarms.clear(OWN_SESSION_RENEW_ALARM);
+		return;
+	}
+	await chrome.alarms.create(OWN_SESSION_RENEW_ALARM, {
+		when: networkTokenRenewalTime(jwt, Date.now(), renewalDraw()),
+	});
+}
+
+// At service worker start: a token without a renewal alarm gets one. An alarm
+// already set is kept, a retry's among them: the worker starts as often as
+// every minute (the health check's alarm), and must not move it.
+async function ensureOwnSessionRenewal(): Promise<void> {
+	// both read as the worker starts
+	const [alarm, stored] = await Promise.all([
+		chrome.alarms.get(OWN_SESSION_RENEW_ALARM),
+		chrome.storage.local.get("by_jwt"),
+	]);
+	const jwt = typeof stored.by_jwt === "string" && stored.by_jwt ? stored.by_jwt : null;
+	if (alarm || !jwt) {
+		return;
+	}
+	await scheduleOwnSessionRenewal(jwt);
+}
+
+// The renewal alarm fired: renew now. A renewal that did not come back is
+// tried again after renewRetryMs, unless the identity changed meanwhile and
+// set its own alarm.
+function renewFromAlarm(): Promise<void> {
+	return serialize(async () => {
+		const jwt = await getJwt();
+		try {
+			await renewInternal();
+		} catch {
+			if (jwt && (await getJwt()) === jwt) {
+				await chrome.alarms.create(OWN_SESSION_RENEW_ALARM, {
+					when: Date.now() + ownSignInSettings.renewRetryMs,
+				});
+			}
+		}
+	});
 }
 
 function pageLocation(locationId: string | null): ConnectLocation | undefined {
@@ -697,7 +896,7 @@ async function handleVerb(
 ): Promise<unknown> {
 	switch (verb) {
 		case "PING": {
-			return { version: chrome.runtime.getManifest().version };
+			return { version: chrome.runtime.getManifest().version, ...BRIDGE_CAPABILITIES };
 		}
 		case "GET_STATUS": {
 			const [user, session, killSwitch] = await Promise.all([
@@ -723,21 +922,38 @@ async function handleVerb(
 			return { session: await getSessionInfo() };
 		}
 		case "SETUP": {
+			const networkName =
+				typeof payload?.networkName === "string" ? payload.networkName : undefined;
+			const authCode = payload?.authCode;
+			if (typeof authCode === "string" && authCode) {
+				const networkId =
+					typeof payload?.networkId === "string" && payload.networkId
+						? payload.networkId
+						: undefined;
+				// the extension's token never crosses into the page: the answer
+				// is the user alone
+				const { user } = await setupWithCode(authCode, networkId, networkName);
+				return { user };
+			}
+			// an older page hands over its own token, and the extension shares
+			// the page's session
 			const jwt = payload?.jwt;
 			if (typeof jwt !== "string" || !jwt) {
 				throw new Error("Missing jwt");
 			}
-			const networkName =
-				typeof payload?.networkName === "string" ? payload.networkName : undefined;
-			return await serialize(() => setupInternal(jwt, networkName));
+			return await serialize(() => setupInternal(jwt, networkName, false));
+		}
+		case "RENEW_SESSION": {
+			// serialized so a renewal cannot interleave with a SETUP/DISCONNECT
+			// that is swapping the stored identity underneath it
+			return { status: await serialize(() => renewInternal()) };
 		}
 		case "REFRESH_JWT": {
 			const jwt = payload?.byJwt;
 			if (typeof jwt !== "string" || !jwt) {
 				throw new Error("Missing byJwt");
 			}
-			// serialized so a refresh cannot interleave with a SETUP/DISCONNECT
-			// that is swapping the stored identity underneath it
+			// serialized like RENEW_SESSION
 			return await serialize(() => refreshJwtInternal(jwt));
 		}
 		case "CONNECT": {
@@ -896,9 +1112,38 @@ export function disconnectFromPopup(): Promise<BridgeSessionInfo> {
 	return serialize(() => disconnectInternal());
 }
 
-// logout: the client goes with the identity
+// logout: the client goes with the identity, released with the identity's
+// token, and then the extension's own session is signed out on the server
+// while the token is still at hand (the popup forgets it after this answers),
+// so the account's Sessions list does not keep a signed-out extension
 export function endFromPopup(): Promise<BridgeSessionInfo> {
-	return serialize(() => endInternal("logout"));
+	return serialize(async () => {
+		const jwt = await getJwt();
+		try {
+			return await endInternal("logout", jwt);
+		} finally {
+			await revokeOwnSessionInternal(jwt);
+			await chrome.storage.local.remove(STORAGE_KEY_OWN_SESSION_ID);
+		}
+	});
+}
+
+// The popup's code sign-in, and SSO's (background/index.ts): the same sign-in
+// of the extension's own as SETUP with a code, of any network. Never rejects:
+// a refusal answers with its code, which the popup words
+// (utils/code-sign-in.ts). The popup gets the token, as JWT_RECEIVED gives it.
+export async function signInWithCode(authCode: string): Promise<CodeSignInAnswer> {
+	try {
+		const { user, jwt } = await setupWithCode(authCode, undefined, undefined);
+		return { success: true, jwt, networkName: user?.networkName ?? undefined };
+	} catch (err) {
+		const failure = err as { message?: unknown; code?: unknown } | null;
+		return {
+			success: false,
+			code: typeof failure?.code === "string" ? failure.code : undefined,
+			error: typeof failure?.message === "string" ? failure.message : undefined,
+		};
+	}
 }
 
 export function sessionForPopup(): Promise<BridgeSessionInfo> {
@@ -1016,16 +1261,27 @@ export function initBridge(): void {
 			// an older version's renewal: nothing to renew, and no new client
 			chrome.alarms.clear(RENEW_ALARM).catch(() => {});
 		}
+		if (alarm.name === OWN_SESSION_RENEW_ALARM) {
+			renewFromAlarm().catch(() => {});
+		}
 	});
 
+	// the worker starts: its own sign-in keeps a renewal alarm
+	ensureOwnSessionRenewal().catch(() => {});
+
 	// USER_CHANGED for every identity change, whichever surface caused it
-	// (popup login, external SET_JWT, bridge SETUP)
+	// (popup login, external SET_JWT, bridge SETUP), and the renewal alarm
+	// set for the identity's token, or cleared without one
 	chrome.storage.onChanged.addListener((changes, area) => {
 		if (area !== "local") return;
 		if (changes.by_jwt || changes.network_name) {
 			getUser()
 				.then((user) => broadcast("USER_CHANGED", { user }))
 				.catch(() => {});
+		}
+		if (changes.by_jwt) {
+			const jwt = changes.by_jwt.newValue;
+			scheduleOwnSessionRenewal(typeof jwt === "string" && jwt ? jwt : null).catch(() => {});
 		}
 		// the popup owns the geolocation override toggle; app tabs learn about it
 		// here so they can start or stop pushing provider locations

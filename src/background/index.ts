@@ -13,13 +13,14 @@ import {
 	migrateLegacyMultiIp,
 	notifySessionChanged,
 	proxyViewForPopup,
+	signInWithCode,
 } from "../bridge/background";
 import type { ConnectLocation } from "../utils/sdk-types";
 import { initDeviceRpcBridge } from "../bridge/device-rpc";
 import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
 import type { FirefoxGlobal } from "../types/firefox-webext";
-import { extensionApiClient } from "../utils/api-client";
-import { isURNetworkApiError } from "@urnetwork/sdk/client";
+import type { CodeSignInAnswer } from "../utils/code-sign-in";
+import { POPUP_CODE_SIGN_IN } from "../utils/own-sign-in";
 
 const HEALTH_ALARM_NAME = "node-health-check";
 
@@ -158,29 +159,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 	})();
 });
 
-async function completeSsoLogin(code: string): Promise<void> {
-	let jwt: string | undefined;
-	try {
-		// public route: no Authorization is sent
-		const result = await extensionApiClient().authCodeLogin({ auth_code: code });
-		jwt = result.by_jwt;
-	} catch (error) {
-		console.error(
-			"SSO code-login failed:",
-			isURNetworkApiError(error) && error.kind === "http" ? error.status : error,
-		);
-		return;
+// SSO's page hands back a sign-in code, which signs the extension in with a
+// session of its own, as the popup's code entry does (bridge/background.ts
+// signInWithCode: the redemption's request id, the typed refusals, and
+// JWT_RECEIVED for the popup).
+async function completeSsoLogin(code: string): Promise<CodeSignInAnswer> {
+	const answer = await signInWithCode(code);
+	if (!answer.success) {
+		console.error("SSO code-login failed:", answer.code ?? answer.error);
 	}
-	if (!jwt) {
-		console.error("SSO code-login returned no JWT");
-		return;
-	}
-
-	await chrome.storage.local.set({ by_jwt: jwt });
-
-	chrome.runtime
-		.sendMessage({ type: "JWT_RECEIVED", jwt })
-		.catch(() => {});
+	return answer;
 }
 
 function isSsoCompleteUrlLegacy(url: string): boolean {
@@ -219,13 +207,28 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 					sendResponse({ success: false, error: "SSO flow failed" });
 					return;
 				}
-				await completeSsoLogin(result.code);
-				sendResponse({ success: true });
+				// a refusal answers its code: the popup says the session cap's
+				// (utils/code-sign-in.ts)
+				const answer = await completeSsoLogin(result.code);
+				sendResponse(
+					answer.success
+						? { success: true }
+						: { success: false, code: answer.code, error: answer.error },
+				);
 			})
 			.catch((err: Error) => {
 				console.error("SSO flow failed:", err);
 				sendResponse({ success: false, error: err.message });
 			});
+		return true;
+	}
+
+	// The popup's code entry (utils/code-sign-in.ts): the code is redeemed here,
+	// so a popup that closes mid-way loses nothing.
+	if (message.type === POPUP_CODE_SIGN_IN) {
+		signInWithCode(typeof message.authCode === "string" ? message.authCode.trim() : "").then(
+			sendResponse,
+		);
 		return true;
 	}
 
@@ -242,6 +245,12 @@ chrome.runtime.onMessageExternal.addListener(
 			return false;
 		}
 
+		// Legacy, kept as it is: ur.io sends no SET_JWT (it sets the extension up
+		// over the content-channel bridge, bridge/background.ts SETUP). The token
+		// it stores is the sending page's own sign-in, so the extension shares
+		// that page's session: its sign-out never revokes it (only a session the
+		// extension signed in itself is, utils/own-sign-in.ts), and the storage
+		// listener sets its renewal alarm.
 		if (message.type === "SET_JWT" && typeof message.jwt === "string") {
 			const storageData: Record<string, string> = { by_jwt: message.jwt };
 			if (typeof message.networkName === "string") {

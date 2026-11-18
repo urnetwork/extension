@@ -8,6 +8,7 @@
 // externally_connectable messaging from web pages). Frame shapes and the port
 // name are defined in protocol.ts.
 import {
+	BRIDGE_CAPABILITIES,
 	BRIDGE_PORT_NAME,
 	DEVICE_RPC_PORT_NAME,
 	EXTENSION_SENDER,
@@ -180,7 +181,8 @@ window.addEventListener("message", (event: MessageEvent) => {
 	if (id == null || typeof verb !== "string") return;
 
 	if (verb === "PING") {
-		post({ dir: "res", id, ok: true, data: { version: extensionVersion() } });
+		// answered here, with what this version's bridge does (protocol.ts)
+		post({ dir: "res", id, ok: true, data: { version: extensionVersion(), ...BRIDGE_CAPABILITIES } });
 		return;
 	}
 

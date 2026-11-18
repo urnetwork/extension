@@ -271,6 +271,19 @@ export function installChromeMock(): ChromeMock {
 				alarmClearCalls.push(name);
 				return Promise.resolve(alarms.delete(name));
 			},
+			// the alarm set under `name`, or undefined, as the promise form answers
+			get: (name: string) => {
+				const info = alarms.get(name);
+				return Promise.resolve(
+					info
+						? {
+								name,
+								scheduledTime: info.when ?? Date.now() + (info.delayInMinutes ?? 0) * 60_000,
+								periodInMinutes: info.periodInMinutes,
+							}
+						: undefined,
+				);
+			},
 			onAlarm: {
 				addListener: (listener: (alarm: chrome.alarms.Alarm) => void) => {
 					onAlarmListeners.push(listener);
