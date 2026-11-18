@@ -3,7 +3,6 @@ import { requestHealthCheck, type ProxyHealthTrigger } from "../utils/proxy-heal
 import { concernsNotifications } from "../utils/alerts-permission";
 import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
-import { isAllowedOrigin } from "../utils/origins";
 import {
 	connectFromPopup,
 	disconnectFromPopup,
@@ -237,51 +236,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 // ── External messages ─────────────────────────────────────────────────────────
 
-chrome.runtime.onMessageExternal.addListener(
-	(message, sender, sendResponse) => {
-		if (!isAllowedOrigin(sender.url)) {
-			console.warn("Message from unauthorized origin:", sender.url);
-			sendResponse({ success: false, error: "Unauthorized origin" });
-			return false;
-		}
-
-		// Legacy, kept as it is: ur.io sends no SET_JWT (it sets the extension up
-		// over the content-channel bridge, bridge/background.ts SETUP). The token
-		// it stores is the sending page's own sign-in, so the extension shares
-		// that page's session: its sign-out never revokes it (only a session the
-		// extension signed in itself is, utils/own-sign-in.ts), and the storage
-		// listener sets its renewal alarm.
-		if (message.type === "SET_JWT" && typeof message.jwt === "string") {
-			const storageData: Record<string, string> = { by_jwt: message.jwt };
-			if (typeof message.networkName === "string") {
-				storageData.network_name = message.networkName;
-			}
-
-			chrome.storage.local.set(storageData, () => {
-				if (chrome.runtime.lastError) {
-					console.error("Failed to store JWT:", chrome.runtime.lastError);
-					sendResponse({ success: false, error: "Storage error" });
-					return;
-				}
-
-				sendResponse({ success: true });
-
-				chrome.runtime
-					.sendMessage({
-						type: "JWT_RECEIVED",
-						jwt: message.jwt,
-						networkName: message.networkName,
-					})
-					.catch(() => {});
-			});
-
-			return true;
-		}
-
-		sendResponse({ success: false, error: "Unknown message type" });
-		return false;
-	},
-);
+// None (owner decision 2026-11-18). The legacy external SET_JWT, which stored a
+// page's own token as the extension's sign-in, is gone with its
+// externally_connectable entry (manifest.config.ts): a page can no longer
+// reach the background directly, and the extension signs in only with a
+// session of its own (SETUP with a sign-in code over the content-channel
+// bridge, the popup's code entry, SSO; utils/own-sign-in.ts).
 
 // ── Internal messages ─────────────────────────────────────────────────────────
 
