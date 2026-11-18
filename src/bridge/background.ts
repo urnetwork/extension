@@ -43,7 +43,8 @@
 // The extension renews its token itself on an alarm (OWN_SESSION_RENEW_ALARM)
 // at networkTokenRenewalTime of the token, set whenever by_jwt changes and at
 // service worker start; a renewal that did not come back is tried again after
-// renewRetryMs. Its popup's sign-out, and a setup that replaces its sign-in,
+// renewRetryMs. An install from before, which holds ur.io's token, moves to a
+// session of its own by itself (migrateToOwnSignIn), and leaves ur.io's alone. Its popup's sign-out, and a setup that replaces its sign-in,
 // sign its own session out on the server before its token is forgotten, best
 // effort and bounded, so a signed-out extension does not stay listed as a live
 // session.
@@ -103,13 +104,20 @@ import { networkTokenRenewalTime, renewNetworkToken } from "@urnetwork/sdk/clien
 import { extensionApiClient } from "../utils/api-client";
 import {
 	OWN_SESSION_RENEW_ALARM,
+	OWN_SIGN_IN_MIGRATION_ALARM,
 	SIGNED_OUT,
 	STORAGE_KEY_OWN_SESSION_ID,
+	STORAGE_KEY_OWN_SIGN_IN_MIGRATION,
 	defaultOwnSignInSettings,
+	migrateOwnSignIn,
+	migrationDue,
+	migrationRetryDelayMs,
+	ownSessionMark,
 	redeemOwnSignIn,
 	renewalDraw,
 	revokeSession,
 	sessionIdOf,
+	type OwnSignInMigrationState,
 } from "../utils/own-sign-in";
 import type { CodeSignInAnswer } from "../utils/code-sign-in";
 import {
@@ -139,6 +147,7 @@ import {
 	removePendingReleaseClients,
 } from "../utils/client-release";
 import {
+	BEST_AVAILABLE_LOCATION_KEY,
 	connectLocationKey,
 	connectLocationPageId,
 	locationIdKey,
@@ -361,6 +370,7 @@ async function connectInternal(location: ConnectLocation | undefined): Promise<C
 	const record = await loadBridgeSession();
 	if (
 		record &&
+		!record.replaceOnConnect &&
 		(!record.networkId || record.networkId === networkId) &&
 		recordLocationKey(record) === connectLocationKey(location) &&
 		!(await savedClientRemoved(record, jwt))
@@ -416,15 +426,20 @@ async function applySavedClient(
 // to. At the plan's proxy cap the new client is refused while the network
 // still holds the one it replaces; the install then gives its client back and
 // creates the new one in that slot (giveBackInstallClients), since it keeps one.
+// `giveBack: false` keeps the refusal instead, and the browser on the client
+// it has (a replacement nobody asked for: migrateToOwnSignIn).
 async function provisionClient(
 	location: ConnectLocation | undefined,
 	jwt: string,
 	networkId: string | null,
+	options: { giveBack?: boolean } = {},
 ): Promise<ConnectOutcome> {
 	const authParams = buildAuthParams(location, await loadPerformanceProfile());
 	let result = await authNetworkClient(authParams, jwt);
 	const gaveBack =
-		Boolean(result.error?.client_limit_exceeded) && (await giveBackInstallClients(jwt, networkId));
+		options.giveBack !== false &&
+		Boolean(result.error?.client_limit_exceeded) &&
+		(await giveBackInstallClients(jwt, networkId));
 	if (gaveBack) {
 		result = await authNetworkClient(authParams, jwt);
 	}
@@ -661,15 +676,17 @@ async function setupInternal(
 	if (name) {
 		storageData.network_name = name;
 	}
-	const ownSessionId = own ? sessionIdOf(jwt) : null;
-	if (ownSessionId) {
-		storageData[STORAGE_KEY_OWN_SESSION_ID] = ownSessionId;
+	if (own) {
+		storageData[STORAGE_KEY_OWN_SESSION_ID] = ownSessionMark(jwt);
 	} else {
 		await chrome.storage.local.remove(STORAGE_KEY_OWN_SESSION_ID);
 	}
+	// a new identity starts any migration afresh: a sign-in of its own needs
+	// none, and a page's token is tried at once (migrateToOwnSignIn)
+	await endMigrationState();
 	await chrome.storage.local.set(storageData);
 
-	// keep the popup in sync (same signal the SET_JWT external path sends)
+	// keep the popup in sync
 	chrome.runtime
 		.sendMessage({ type: "JWT_RECEIVED", jwt, networkName: name })
 		.catch(() => {});
@@ -726,6 +743,11 @@ async function renewInternal(): Promise<RenewStatus> {
 	const name = parseJwtClaims(renewal.byJwt)?.network_name;
 	if (typeof name === "string" && name) {
 		storageData.network_name = name;
+	}
+	// a renewal is the same sign-in: one of the extension's own stays its own
+	// (the server can tag an untagged one with a session as it renews)
+	if (await isOwnSignIn(jwt)) {
+		storageData[STORAGE_KEY_OWN_SESSION_ID] = ownSessionMark(renewal.byJwt);
 	}
 	await chrome.storage.local.set(storageData);
 	// keep the popup in sync (same signal SETUP sends); app tabs get
@@ -801,6 +823,7 @@ async function endSignInInternal(): Promise<void> {
 		STORAGE_KEY_SELECTED_LOCATION,
 	]);
 	await chrome.alarms.clear(OWN_SESSION_RENEW_ALARM);
+	await endMigrationState();
 	// an open popup goes back to its sign-in (utils/code-sign-in.ts onSignedOut)
 	chrome.runtime.sendMessage({ type: SIGNED_OUT }).catch(() => {});
 	broadcast("USER_CHANGED", { user: null });
@@ -869,6 +892,196 @@ function renewFromAlarm(): Promise<void> {
 			}
 		}
 	});
+}
+
+// Whether `jwt` is a sign-in the extension made itself (its mark is stored).
+async function isOwnSignIn(jwt: string): Promise<boolean> {
+	const stored = await chrome.storage.local.get(STORAGE_KEY_OWN_SESSION_ID);
+	return stored[STORAGE_KEY_OWN_SESSION_ID] === ownSessionMark(jwt);
+}
+
+// ---- the migration to a session of the extension's own ---------------------
+//
+// An install from before the extension signed in itself holds ur.io's token
+// (an older page's SETUP {jwt}, an older version's SET_JWT), so it shares
+// ur.io's session, and ur.io's sign-out signs it out. Owner decision
+// 2026-11-18, "Migrate automatically": at its next start the extension creates
+// a sign-in code with the token it holds, redeems it for a session of its own,
+// checks it as SETUP does (utils/own-sign-in.ts migrateOwnSignIn), and only
+// then switches over. ur.io's session is left alone, never signed out. It runs
+// once: a try that did not happen (the session cap, a token that ended, no
+// answer) keeps the old token, which goes on working, and the next try waits on
+// a backoff (OwnSignInSettings.migrationRetryMs, a few tries a day at most),
+// from a state kept in storage so that a service worker starting every minute
+// tries no more often, and on an alarm. A try is counted before it is made: one
+// the worker does not finish counts as one that did not happen.
+
+export type OwnSignInMigrationOutcome = "not_needed" | "waiting" | "migrated" | "failed";
+
+async function loadMigrationState(): Promise<OwnSignInMigrationState | null> {
+	const stored = await chrome.storage.local.get(STORAGE_KEY_OWN_SIGN_IN_MIGRATION);
+	const value = stored[STORAGE_KEY_OWN_SIGN_IN_MIGRATION] as Partial<OwnSignInMigrationState> | undefined;
+	if (!value || typeof value.failures !== "number" || typeof value.nextAttemptAt !== "number") {
+		return null;
+	}
+	return { failures: value.failures, nextAttemptAt: value.nextAttemptAt };
+}
+
+// No migration to come: its state and its alarm go.
+async function endMigrationState(): Promise<void> {
+	await chrome.storage.local.remove(STORAGE_KEY_OWN_SIGN_IN_MIGRATION);
+	await chrome.alarms.clear(OWN_SIGN_IN_MIGRATION_ALARM);
+}
+
+// Whether the stored sign-in is one to migrate: a member's sign-in of a
+// network that the extension did not make itself.
+async function needsOwnSignInMigration(jwt: string): Promise<boolean> {
+	const claims = parseJwtClaims(jwt);
+	if (!claims || claims.guest_mode || typeof claims.network_id !== "string" || !claims.network_id) {
+		return false;
+	}
+	return !(await isOwnSignIn(jwt));
+}
+
+// the try under way: a worker start and the alarm that come together share it
+let migrationInFlight: Promise<OwnSignInMigrationOutcome> | null = null;
+
+/**
+ * The migration to a session of the extension's own, at the service worker's
+ * start (background/index.ts) and on its alarm: a try now when one is due,
+ * else nothing before the next try's time.
+ */
+export function migrateToOwnSignIn(): Promise<OwnSignInMigrationOutcome> {
+	if (!migrationInFlight) {
+		migrationInFlight = migrateToOwnSignInOnce().finally(() => {
+			migrationInFlight = null;
+		});
+	}
+	return migrationInFlight;
+}
+
+async function migrateToOwnSignInOnce(): Promise<OwnSignInMigrationOutcome> {
+	const heldJwt = await getJwt();
+	if (!heldJwt || !(await needsOwnSignInMigration(heldJwt))) {
+		await endMigrationState();
+		return "not_needed";
+	}
+	const now = Date.now();
+	const state = await loadMigrationState();
+	if (!migrationDue(state, now) && state) {
+		// a start between tries: the alarm brings the next one (an alarm the
+		// browser dropped is set again)
+		if (!(await chrome.alarms.get(OWN_SIGN_IN_MIGRATION_ALARM))) {
+			await chrome.alarms.create(OWN_SIGN_IN_MIGRATION_ALARM, { when: state.nextAttemptAt });
+		}
+		return "waiting";
+	}
+	// counted before it is made
+	const failures = (state?.failures ?? 0) + 1;
+	const next: OwnSignInMigrationState = {
+		failures,
+		nextAttemptAt: now + migrationRetryDelayMs(failures, ownSignInSettings),
+	};
+	await chrome.storage.local.set({ [STORAGE_KEY_OWN_SIGN_IN_MIGRATION]: next });
+	await chrome.alarms.create(OWN_SIGN_IN_MIGRATION_ALARM, { when: next.nextAttemptAt });
+
+	let ownJwt: string;
+	try {
+		ownJwt = await migrateOwnSignIn(extensionApiClient(), heldJwt, ownSignInSettings);
+	} catch (err) {
+		console.warn("The move to a sign-in of the extension's own did not happen; tried again later:", err);
+		return "failed";
+	}
+	const switched = await serialize(() => switchToOwnSignInInternal(heldJwt, ownJwt));
+	if (!switched) {
+		// the popup signed out, or in, while the code was redeemed: the sign-in
+		// is not used, and is signed out so the account's list does not keep it
+		const sessionId = sessionIdOf(ownJwt);
+		if (sessionId) {
+			await revokeSession(extensionApiClient(), ownJwt, sessionId, ownSignInSettings);
+		}
+		// the identity it was for is gone: the next start looks afresh
+		await endMigrationState();
+		return "not_needed";
+	}
+	await endMigrationState();
+	return "migrated";
+}
+
+// The switch to the sign-in of the extension's own that the migration
+// redeemed, in place of ur.io's token it still holds: the same network, so
+// nothing is torn down and ur.io's session is left alone. The install's client
+// was made with ur.io's token and carries ur.io's session, whose sign-out
+// deactivates it, so it is replaced by one made with the extension's own
+// (replaceSharedSessionClient). Run serialized. False when the extension no
+// longer holds `heldJwt`.
+async function switchToOwnSignInInternal(heldJwt: string, ownJwt: string): Promise<boolean> {
+	if ((await getJwt()) !== heldJwt) {
+		return false;
+	}
+	// marked before the switch, so a worker that stops between the two leaves
+	// the client to the next connect to replace
+	const record = await loadBridgeSession();
+	if (record) {
+		await saveBridgeSession({ ...record, replaceOnConnect: true });
+	}
+	const storageData: Record<string, string> = {
+		by_jwt: ownJwt,
+		[STORAGE_KEY_OWN_SESSION_ID]: ownSessionMark(ownJwt),
+	};
+	const name = parseJwtClaims(ownJwt)?.network_name;
+	if (typeof name === "string" && name) {
+		storageData.network_name = name;
+	}
+	await chrome.storage.local.set(storageData);
+	// keep the popup in sync; app tabs get USER_CHANGED from the storage listener
+	chrome.runtime
+		.sendMessage({ type: "JWT_RECEIVED", jwt: ownJwt, networkName: storageData.network_name })
+		.catch(() => {});
+	await replaceSharedSessionClient(ownJwt);
+	return true;
+}
+
+// The install's client made with ur.io's token: while the browser is connected
+// through it, a new one at its location is made with the extension's own token
+// and applied, and it is removed (provisionClient, without giving the client
+// back at the plan's cap: the browser stays on the client it has, and the
+// next connect replaces it, replaceOnConnect). Not connected, it is given back
+// now, and the next connect makes one anew.
+async function replaceSharedSessionClient(ownJwt: string): Promise<void> {
+	const record = await loadBridgeSession();
+	const storedClientId = await chromeStorageAdapter.getItem(STORAGE_KEY_CLIENT_ID);
+	if (!record && !storedClientId) {
+		return;
+	}
+	if (record && (await getSessionInfo()).connected) {
+		try {
+			await provisionClient(recordLocation(record), ownJwt, jwtNetworkId(ownJwt), { giveBack: false });
+		} catch {
+			// the browser stays on the client it has, for the next connect to replace
+		}
+		return;
+	}
+	await addPendingReleaseClients(
+		[record?.clientId, storedClientId].filter((id): id is string => Boolean(id)),
+	);
+	await clearBridgeSession();
+	await chromeStorageAdapter.removeItem(STORAGE_KEY_CLIENT_ID);
+	await clearFailedClient();
+	await releaseBridgeClients([], [], ownJwt);
+}
+
+// The connect location a saved client's hosted device runs at, from its key.
+function recordLocation(record: BridgeSessionRecord): ConnectLocation | undefined {
+	const key = recordLocationKey(record);
+	if (key === BEST_AVAILABLE_LOCATION_KEY) {
+		return undefined;
+	}
+	try {
+		return { connect_location_id: JSON.parse(key) as unknown } as ConnectLocation;
+	} catch {
+		return pageLocation(record.locationId ?? null);
+	}
 }
 
 function pageLocation(locationId: string | null): ConnectLocation | undefined {
@@ -1124,6 +1337,7 @@ export function endFromPopup(): Promise<BridgeSessionInfo> {
 		} finally {
 			await revokeOwnSessionInternal(jwt);
 			await chrome.storage.local.remove(STORAGE_KEY_OWN_SESSION_ID);
+			await endMigrationState();
 		}
 	});
 }
@@ -1264,13 +1478,16 @@ export function initBridge(): void {
 		if (alarm.name === OWN_SESSION_RENEW_ALARM) {
 			renewFromAlarm().catch(() => {});
 		}
+		if (alarm.name === OWN_SIGN_IN_MIGRATION_ALARM) {
+			migrateToOwnSignIn().catch(() => {});
+		}
 	});
 
 	// the worker starts: its own sign-in keeps a renewal alarm
 	ensureOwnSessionRenewal().catch(() => {});
 
 	// USER_CHANGED for every identity change, whichever surface caused it
-	// (popup login, external SET_JWT, bridge SETUP), and the renewal alarm
+	// (popup login, bridge SETUP, a renewal), and the renewal alarm
 	// set for the identity's token, or cleared without one
 	chrome.storage.onChanged.addListener((changes, area) => {
 		if (area !== "local") return;

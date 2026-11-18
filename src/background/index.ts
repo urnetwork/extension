@@ -10,6 +10,7 @@ import {
 	handleExtensionLocationChange,
 	initBridge,
 	migrateLegacyMultiIp,
+	migrateToOwnSignIn,
 	notifySessionChanged,
 	proxyViewForPopup,
 	signInWithCode,
@@ -113,7 +114,9 @@ function thrownFailure(err: unknown): Promise<Record<string, unknown>> {
 // ── Startup ───────────────────────────────────────────────────────────────────
 
 // Restore the saved proxy, then replace an older version's multi-IP pool with
-// the install's one client (bridge/background.ts migrateLegacyMultiIp).
+// the install's one client (bridge/background.ts migrateLegacyMultiIp), then
+// move an install that still holds ur.io's token to a session of its own
+// (migrateToOwnSignIn: once, with tries on a backoff).
 function restoreThenMigrate(): void {
 	proxyManager
 		.restoreState()
@@ -123,6 +126,10 @@ function restoreThenMigrate(): void {
 		.then(() => migrateLegacyMultiIp())
 		.catch((err) => {
 			console.error("Failed to replace the multi-IP pool:", err);
+		})
+		.then(() => migrateToOwnSignIn())
+		.catch((err) => {
+			console.error("Failed to move to a sign-in of the extension's own:", err);
 		});
 }
 

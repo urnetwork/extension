@@ -20,9 +20,17 @@
 //
 // Only the session the extension signed in itself is revoked
 // (STORAGE_KEY_OWN_SESSION_ID): a token a page handed over (an older page's
-// SETUP {jwt}, the legacy external SET_JWT) is the page's own session, and
-// revoking it would sign the page out too.
+// SETUP {jwt}, or an older version's external SET_JWT, removed 2026-11-18) is
+// the page's own session, and revoking it would sign the page out too.
+//
+// An install from before holds such a token, ur.io's, and shares ur.io's
+// session. It moves to a session of its own by itself (owner decision
+// 2026-11-18, "Migrate automatically"; bridge/background.ts
+// migrateToOwnSignIn): a sign-in code created with the token it holds,
+// redeemed and checked as SETUP's code is (migrateOwnSignIn), and only then the
+// switch. ur.io's session is left alone, never signed out.
 import {
+	createSignInCode,
 	isURNetworkApiError,
 	redeemSignInCode,
 	SESSION_LIMIT_REACHED_CODE,
@@ -42,6 +50,10 @@ export type OwnSignInSettings = {
 	// ms a sign-out waits for the server to sign the session out before the
 	// local sign-out goes on without it
 	revokeTimeoutMs: number;
+	// ms from a migration to a session of the extension's own that did not
+	// happen to the next try, by the failures so far: the nth failure waits
+	// the nth entry, and the last entry repeats
+	migrationRetryMs: number[];
 };
 
 export function defaultOwnSignInSettings(): OwnSignInSettings {
@@ -54,11 +66,35 @@ export function defaultOwnSignInSettings(): OwnSignInSettings {
 		renewRetryMs: 15 * 60 * 1000,
 		// a sign-out is the user's, and the server's part is best effort
 		revokeTimeoutMs: 2_000,
+		// at most a few tries a day (owner, 2026-11-18): 4 in the first day,
+		// then 3; the old sign-in works on meanwhile
+		migrationRetryMs: [2 * HOUR_MS, 8 * HOUR_MS],
 	};
 }
 
-// The session_id of the sign-in the extension made itself (its token's claim).
+const HOUR_MS = 60 * 60 * 1000;
+
+// The session_id of the sign-in the extension made itself (its token's claim),
+// or UNTAGGED_OWN_SESSION for one without (ownSessionMark).
 export const STORAGE_KEY_OWN_SESSION_ID = "own_session_id";
+
+// The own-session mark of a sign-in the extension made itself whose token has
+// no session_id (a server without sessions): such a sign-in is the
+// extension's own all the same, and is not migrated again.
+export const UNTAGGED_OWN_SESSION = "untagged";
+
+// The migration to a session of the extension's own: its state while a try
+// is to come ({failures, nextAttemptAt}, epoch ms), and the alarm of the next
+// try. Durable state in the user's browser: a rename strands what is set.
+export const STORAGE_KEY_OWN_SIGN_IN_MIGRATION = "own_sign_in_migration";
+export const OWN_SIGN_IN_MIGRATION_ALARM = "urn-own-sign-in-migrate";
+
+export type OwnSignInMigrationState = {
+	// the tries that did not happen so far, the one under way included
+	failures: number;
+	// no try before this
+	nextAttemptAt: number;
+};
 
 // The renewal alarm of the extension's own sign-in. Durable state in the
 // user's browser: a rename strands the alarms already set.
@@ -91,6 +127,28 @@ function codedError(message: string, code: string): Error & { code: string } {
 export function sessionIdOf(byJwt: string): string | null {
 	const sessionId = parseJwtClaims(byJwt)?.session_id;
 	return typeof sessionId === "string" && sessionId !== "" ? sessionId : null;
+}
+
+/** What STORAGE_KEY_OWN_SESSION_ID holds for a sign-in of the extension's own. */
+export function ownSessionMark(byJwt: string): string {
+	return sessionIdOf(byJwt) ?? UNTAGGED_OWN_SESSION;
+}
+
+/** The wait before the next migration try after `failures` tries that did not happen. */
+export function migrationRetryDelayMs(
+	failures: number,
+	settings: OwnSignInSettings = defaultOwnSignInSettings(),
+): number {
+	const delays = settings.migrationRetryMs;
+	return delays[Math.min(Math.max(failures, 1), delays.length) - 1];
+}
+
+/**
+ * Whether a stored state's next migration try is due at `nowMs`: no state
+ * (no try yet), or its time has come.
+ */
+export function migrationDue(state: OwnSignInMigrationState | null, nowMs: number): boolean {
+	return !state || state.nextAttemptAt <= nowMs;
 }
 
 // Whether a redemption that rejected may have reached the server and lost its
@@ -189,6 +247,33 @@ export async function redeemOwnSignIn(
 		throw refusal;
 	}
 	return byJwt;
+}
+
+/**
+ * A sign-in of the extension's own in place of a token of another session it
+ * holds (ur.io's): a one-use sign-in code created with that token (the sdk's
+ * createSignInCode, POST /auth/code-create with it as the bearer), redeemed
+ * and checked as SETUP's code is (redeemOwnSignIn), of the token's network.
+ * Nothing signs the held token's session out. Rejects, the held token as good
+ * as it was, when the server refused the code (AUTH_CODE_REFUSED, also for
+ * the account's most codes), when the held token ended (401), the session cap
+ * (SESSION_LIMIT_REACHED_CODE), another network's sign-in (WRONG_NETWORK,
+ * which is signed out unused), or no answer.
+ */
+export async function migrateOwnSignIn(
+	client: URNetworkApiClient,
+	heldJwt: string,
+	settings: OwnSignInSettings = defaultOwnSignInSettings(),
+): Promise<string> {
+	const networkId = parseJwtClaims(heldJwt)?.network_id;
+	if (typeof networkId !== "string" || networkId === "") {
+		throw new Error("The sign-in held names no network.");
+	}
+	const creation = await createSignInCode(client, { token: heldJwt });
+	if (creation.kind !== "created") {
+		throw codedError(creation.message || "The sign-in code was not created.", AUTH_CODE_REFUSED);
+	}
+	return redeemOwnSignIn(client, creation.authCode, networkId, settings);
 }
 
 /** A draw in [0, 1) for networkTokenRenewalTime, from the browser's cryptographic source. */
