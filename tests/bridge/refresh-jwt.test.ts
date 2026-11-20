@@ -1,14 +1,24 @@
-// REFRESH_JWT — the in-place jwt swap added for the post-payment entitlement
-// re-push (see APP.md in mmm/ur.io). Contract under test:
+// REFRESH_JWT — an older ur.io page's push of its fresh token after a payment
+// or an upgrade (APP.md in mmm/ur.io, extensionStore repushExtensionJwt). The
+// extension used to swap the pushed token in, which made the page's session
+// its own too: a sign-out on ur.io signed the extension out, and the account's
+// Sessions list could not tell the two apart. Since it signs in with a session
+// of its own (owner decision 2026-11-18), it never adopts a page's token: it
+// renews its own, which carries the same new claims (a payment's Pro), and
+// answers refreshed so the older page does not fall back to SETUP {jwt}.
+// Contract under test:
 //
-//   refreshed     — same-network jwt replaces by_jwt in storage, nothing else
-//                   moves (the zero-disruption property: the live proxy
-//                   session, its renewal alarm, and the bridge session record
-//                   are all untouched, and no api call is made)
-//   no_session    — no stored identity, nothing swapped
-//   wrong_network — different network_id, nothing swapped (page falls back to
-//                   SETUP, whose teardown-and-replace behavior is pinned here
-//                   as the contrast so a refactor cannot silently merge them)
+//   refreshed     — the extension's own token renewed with its own bearer,
+//                   nothing else moves (the zero-disruption property: the
+//                   live proxy session, the bridge session record and the old
+//                   version's alarm are untouched, and nothing is provisioned
+//                   or released); also when the renewal gets no answer, which
+//                   leaves the token for its alarm to renew
+//   no_session    — no stored identity, nothing renewed; or the renewal was
+//                   rejected (the sign-in ended) and the extension signed out
+//   wrong_network — different network_id, nothing renewed (the page falls
+//                   back to SETUP, whose teardown-and-replace behavior is
+//                   pinned here as the contrast)
 //
 // Malformed and guest jwts are rejected as errors (thrown, not statuses).
 import { beforeEach, describe, expect, it } from "vitest";
@@ -22,7 +32,27 @@ import {
 	type FakePort,
 	type LiveSessionSeed,
 } from "./harness";
+import { noAnswer, serveApi, type FakeApi } from "./fake-api";
 import { SYSTEM_PROXY } from "../chrome-mock";
+
+const RENEW = "POST /auth/network-refresh";
+
+// the token the page pushes: the page's own sign-in, after a payment
+const PAGE_JWT = makeJwt({
+	network_id: NETWORK_ID,
+	network_name: "testnet",
+	session_id: "0c0c0c0c-0000-4000-8000-000000000003",
+	entitlement: "supporter",
+});
+
+// the extension's own token, renewed by the server: its session, the new claims
+const RENEWED_JWT = makeJwt({
+	network_id: NETWORK_ID,
+	network_name: "testnet",
+	user_id: "user-1",
+	entitlement: "supporter",
+	renewed: true,
+});
 
 describe("REFRESH_JWT", () => {
 	let h: BridgeHarness;
@@ -35,37 +65,35 @@ describe("REFRESH_JWT", () => {
 
 	describe("with a live session (seeded)", () => {
 		let seed: LiveSessionSeed;
+		let api: FakeApi;
 
 		beforeEach(async () => {
 			seed = await h.seedLiveSession();
+			api = serveApi({ [RENEW]: () => ({ json: { by_jwt: RENEWED_JWT } }) });
 		});
 
-		it("swaps the stored jwt in place and responds refreshed", async () => {
-			const newJwt = makeJwt({
-				network_id: NETWORK_ID,
-				network_name: "testnet",
-				// the whole point of the verb: a fresh claim set post-payment
-				entitlement: "supporter",
-			});
-
-			const res = await app.request("REFRESH_JWT", { byJwt: newJwt });
+		it("renews its own token instead of adopting the page's, and responds refreshed", async () => {
+			const res = await app.request("REFRESH_JWT", { byJwt: PAGE_JWT });
 
 			expect(res.ok).toBe(true);
 			expect(res.data).toMatchObject({
 				status: "refreshed",
 				user: { networkId: NETWORK_ID, networkName: "testnet", guestMode: false },
 			});
-			expect(h.chrome.getStored("by_jwt")).toBe(newJwt);
+			// renewed with the extension's own bearer; the page's token is never sent
+			expect(api.callsTo(RENEW)).toEqual([expect.objectContaining({ authorization: `Bearer ${seed.jwt}` })]);
+			expect(JSON.stringify(api.calls)).not.toContain(PAGE_JWT);
+			// stored: the renewed token of its own session, never the page's
+			expect(h.chrome.getStored("by_jwt")).toBe(RENEWED_JWT);
+			expect(JSON.stringify([...h.chrome.storageData.values()])).not.toContain(PAGE_JWT);
 			// popup kept in sync over the same signal SETUP sends
 			expect(h.chrome.runtimeMessages).toContainEqual(
-				expect.objectContaining({ type: "JWT_RECEIVED", jwt: newJwt }),
+				expect.objectContaining({ type: "JWT_RECEIVED", jwt: RENEWED_JWT }),
 			);
 		});
 
 		it("leaves the live session state untouched (zero-disruption)", async () => {
-			const newJwt = makeJwt({ network_id: NETWORK_ID, network_name: "testnet" });
-
-			const res = await app.request("REFRESH_JWT", { byJwt: newJwt });
+			const res = await app.request("REFRESH_JWT", { byJwt: PAGE_JWT });
 			expect(res.ok).toBe(true);
 
 			// proxy: never reconfigured, still the seeded fixed-server session
@@ -74,24 +102,46 @@ describe("REFRESH_JWT", () => {
 				mode: "fixed_servers",
 				rules: { singleProxy: { host: seed.proxyHostLabel } },
 			});
-			// renewal alarm: neither cleared nor rescheduled
+			// the old version's alarm: neither cleared nor rescheduled
 			expect(h.chrome.alarmClearCalls).toHaveLength(0);
 			expect(h.chrome.alarms.has(RENEW_ALARM)).toBe(true);
 			// durable session record: byte-for-byte what was seeded
 			expect(h.chrome.getStored("bridge_session")).toEqual(seed.record);
 			expect(h.chrome.getStored("proxy_client_id")).toBe(seed.record.clientId);
-			// no provisioning, no client release, no network at all
+			// no provisioning, no client release
 			expect(h.api.authNetworkClient).not.toHaveBeenCalled();
 			expect(h.api.removeNetworkClient).not.toHaveBeenCalled();
 		});
 
-		it("responds wrong_network for a different network's jwt and swaps nothing", async () => {
+		it("responds refreshed when the renewal gets no answer, and keeps its token", async () => {
+			api = serveApi({ [RENEW]: noAnswer });
+
+			const res = await app.request("REFRESH_JWT", { byJwt: PAGE_JWT });
+
+			// not an error: the older page would fall back to SETUP {jwt}
+			expect(res).toMatchObject({ ok: true, data: { status: "refreshed" } });
+			expect(h.chrome.getStored("by_jwt")).toBe(seed.jwt);
+		});
+
+		it("a rejected renewal signs the extension out and responds no_session", async () => {
+			api = serveApi({ [RENEW]: () => ({ status: 401, json: { error: "session_revoked" } }) });
+
+			const res = await app.request("REFRESH_JWT", { byJwt: PAGE_JWT });
+
+			expect(res).toMatchObject({ ok: true, data: { status: "no_session" } });
+			expect(h.chrome.getStored("by_jwt")).toBeUndefined();
+			expect(h.chrome.getStored("bridge_session")).toBeUndefined();
+			expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
+		});
+
+		it("responds wrong_network for a different network's jwt and renews nothing", async () => {
 			const foreignJwt = makeJwt({ network_id: OTHER_NETWORK_ID });
 
 			const res = await app.request("REFRESH_JWT", { byJwt: foreignJwt });
 
 			expect(res.ok).toBe(true);
 			expect(res.data).toMatchObject({ status: "wrong_network" });
+			expect(api.calls).toHaveLength(0);
 			expect(h.chrome.getStored("by_jwt")).toBe(seed.jwt);
 			expect(h.chrome.proxySettingsSetCalls).toHaveLength(0);
 			expect(h.chrome.getStored("bridge_session")).toEqual(seed.record);
@@ -110,6 +160,7 @@ describe("REFRESH_JWT", () => {
 			const res = await app.request("REFRESH_JWT", { byJwt: "not-a-jwt" });
 			expect(res.ok).toBe(false);
 			expect(res.error).toBe("Invalid token");
+			expect(api.calls).toHaveLength(0);
 			expect(h.chrome.getStored("by_jwt")).toBe(seed.jwt);
 		});
 
@@ -142,11 +193,13 @@ describe("REFRESH_JWT", () => {
 	});
 
 	it("responds no_session when the extension holds no identity", async () => {
+		const api = serveApi({});
 		const res = await app.request("REFRESH_JWT", {
 			byJwt: makeJwt({ network_id: NETWORK_ID }),
 		});
 		expect(res.ok).toBe(true);
 		expect(res.data).toEqual({ status: "no_session" });
+		expect(api.calls).toHaveLength(0);
 		expect(h.chrome.getStored("by_jwt")).toBeUndefined();
 	});
 });
@@ -183,7 +236,7 @@ describe("SETUP vs REFRESH_JWT contrast", () => {
 		// proxy torn down: the setting released, the browser's own back
 		expect(h.chrome.proxySettingsClearCalls.length).toBeGreaterThan(0);
 		expect(h.chrome.proxyValue()).toEqual(SYSTEM_PROXY);
-		// durable session state and renewal alarm gone
+		// durable session state and the old version's alarm gone
 		expect(h.chrome.getStored("bridge_session")).toBeUndefined();
 		expect(h.chrome.getStored("proxy_client_id")).toBeUndefined();
 		expect(h.chrome.alarmClearCalls).toContain(RENEW_ALARM);
@@ -207,13 +260,13 @@ describe("SETUP vs REFRESH_JWT contrast", () => {
 	});
 
 	it("REFRESH_JWT performs none of SETUP's teardown", async () => {
-		const newJwt = makeJwt({ network_id: NETWORK_ID, network_name: "testnet" });
+		serveApi({ [RENEW]: () => ({ json: { by_jwt: RENEWED_JWT } }) });
 
-		const res = await app.request("REFRESH_JWT", { byJwt: newJwt });
+		const res = await app.request("REFRESH_JWT", { byJwt: PAGE_JWT });
 
 		expect(res.ok).toBe(true);
 		expect(res.data).toMatchObject({ status: "refreshed" });
-		expect(h.chrome.getStored("by_jwt")).toBe(newJwt);
+		expect(h.chrome.getStored("by_jwt")).toBe(RENEWED_JWT);
 		// everything SETUP dismantles is still standing
 		expect(h.chrome.proxySettingsSetCalls).toHaveLength(0);
 		expect(h.chrome.proxyValue()).toMatchObject({ mode: "fixed_servers" });

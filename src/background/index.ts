@@ -3,7 +3,6 @@ import { requestHealthCheck, type ProxyHealthTrigger } from "../utils/proxy-heal
 import { concernsNotifications } from "../utils/alerts-permission";
 import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
-import { isAllowedOrigin } from "../utils/origins";
 import {
 	connectFromPopup,
 	disconnectFromPopup,
@@ -11,15 +10,17 @@ import {
 	handleExtensionLocationChange,
 	initBridge,
 	migrateLegacyMultiIp,
+	migrateToOwnSignIn,
 	notifySessionChanged,
 	proxyViewForPopup,
+	signInWithCode,
 } from "../bridge/background";
 import type { ConnectLocation } from "../utils/sdk-types";
 import { initDeviceRpcBridge } from "../bridge/device-rpc";
 import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
 import type { FirefoxGlobal } from "../types/firefox-webext";
-import { extensionApiClient } from "../utils/api-client";
-import { isURNetworkApiError } from "@urnetwork/sdk/client";
+import type { CodeSignInAnswer } from "../utils/code-sign-in";
+import { POPUP_CODE_SIGN_IN } from "../utils/own-sign-in";
 
 const HEALTH_ALARM_NAME = "node-health-check";
 
@@ -113,7 +114,9 @@ function thrownFailure(err: unknown): Promise<Record<string, unknown>> {
 // ── Startup ───────────────────────────────────────────────────────────────────
 
 // Restore the saved proxy, then replace an older version's multi-IP pool with
-// the install's one client (bridge/background.ts migrateLegacyMultiIp).
+// the install's one client (bridge/background.ts migrateLegacyMultiIp), then
+// move an install that still holds ur.io's token to a session of its own
+// (migrateToOwnSignIn: once, with tries on a backoff).
 function restoreThenMigrate(): void {
 	proxyManager
 		.restoreState()
@@ -123,6 +126,10 @@ function restoreThenMigrate(): void {
 		.then(() => migrateLegacyMultiIp())
 		.catch((err) => {
 			console.error("Failed to replace the multi-IP pool:", err);
+		})
+		.then(() => migrateToOwnSignIn())
+		.catch((err) => {
+			console.error("Failed to move to a sign-in of the extension's own:", err);
 		});
 }
 
@@ -158,29 +165,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 	})();
 });
 
-async function completeSsoLogin(code: string): Promise<void> {
-	let jwt: string | undefined;
-	try {
-		// public route: no Authorization is sent
-		const result = await extensionApiClient().authCodeLogin({ auth_code: code });
-		jwt = result.by_jwt;
-	} catch (error) {
-		console.error(
-			"SSO code-login failed:",
-			isURNetworkApiError(error) && error.kind === "http" ? error.status : error,
-		);
-		return;
+// SSO's page hands back a sign-in code, which signs the extension in with a
+// session of its own, as the popup's code entry does (bridge/background.ts
+// signInWithCode: the redemption's request id, the typed refusals, and
+// JWT_RECEIVED for the popup).
+async function completeSsoLogin(code: string): Promise<CodeSignInAnswer> {
+	const answer = await signInWithCode(code);
+	if (!answer.success) {
+		console.error("SSO code-login failed:", answer.code ?? answer.error);
 	}
-	if (!jwt) {
-		console.error("SSO code-login returned no JWT");
-		return;
-	}
-
-	await chrome.storage.local.set({ by_jwt: jwt });
-
-	chrome.runtime
-		.sendMessage({ type: "JWT_RECEIVED", jwt })
-		.catch(() => {});
+	return answer;
 }
 
 function isSsoCompleteUrlLegacy(url: string): boolean {
@@ -219,8 +213,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 					sendResponse({ success: false, error: "SSO flow failed" });
 					return;
 				}
-				await completeSsoLogin(result.code);
-				sendResponse({ success: true });
+				// a refusal answers its code: the popup says the session cap's
+				// (utils/code-sign-in.ts)
+				const answer = await completeSsoLogin(result.code);
+				sendResponse(
+					answer.success
+						? { success: true }
+						: { success: false, code: answer.code, error: answer.error },
+				);
 			})
 			.catch((err: Error) => {
 				console.error("SSO flow failed:", err);
@@ -229,50 +229,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 		return true;
 	}
 
+	// The popup's code entry (utils/code-sign-in.ts): the code is redeemed here,
+	// so a popup that closes mid-way loses nothing.
+	if (message.type === POPUP_CODE_SIGN_IN) {
+		signInWithCode(typeof message.authCode === "string" ? message.authCode.trim() : "").then(
+			sendResponse,
+		);
+		return true;
+	}
+
 	return false;
 });
 
 // ── External messages ─────────────────────────────────────────────────────────
 
-chrome.runtime.onMessageExternal.addListener(
-	(message, sender, sendResponse) => {
-		if (!isAllowedOrigin(sender.url)) {
-			console.warn("Message from unauthorized origin:", sender.url);
-			sendResponse({ success: false, error: "Unauthorized origin" });
-			return false;
-		}
-
-		if (message.type === "SET_JWT" && typeof message.jwt === "string") {
-			const storageData: Record<string, string> = { by_jwt: message.jwt };
-			if (typeof message.networkName === "string") {
-				storageData.network_name = message.networkName;
-			}
-
-			chrome.storage.local.set(storageData, () => {
-				if (chrome.runtime.lastError) {
-					console.error("Failed to store JWT:", chrome.runtime.lastError);
-					sendResponse({ success: false, error: "Storage error" });
-					return;
-				}
-
-				sendResponse({ success: true });
-
-				chrome.runtime
-					.sendMessage({
-						type: "JWT_RECEIVED",
-						jwt: message.jwt,
-						networkName: message.networkName,
-					})
-					.catch(() => {});
-			});
-
-			return true;
-		}
-
-		sendResponse({ success: false, error: "Unknown message type" });
-		return false;
-	},
-);
+// None (owner decision 2026-11-18). The legacy external SET_JWT, which stored a
+// page's own token as the extension's sign-in, is gone with its
+// externally_connectable entry (manifest.config.ts): a page can no longer
+// reach the background directly, and the extension signs in only with a
+// session of its own (SETUP with a sign-in code over the content-channel
+// bridge, the popup's code entry, SSO; utils/own-sign-in.ts).
 
 // ── Internal messages ─────────────────────────────────────────────────────────
 

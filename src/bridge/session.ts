@@ -26,6 +26,12 @@ export type BridgeSessionRecord = {
 	// the network the client belongs to; a record without one predates it and
 	// belongs to the stored identity (setup and logout remove the record)
 	networkId?: string | null;
+	// the client was made with a sign-in the extension no longer holds, the
+	// ur.io session an install shared before it migrated to a session of its
+	// own (background.ts migrateToOwnSignIn): it carries that session, whose
+	// sign-out deactivates it, so the next connect makes a new client rather
+	// than applying it again
+	replaceOnConnect?: boolean;
 };
 
 const BRIDGE_SESSION_KEY = "bridge_session";

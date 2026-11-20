@@ -86,6 +86,10 @@ export type ChromeMock = {
 	onStorageChangedListeners: StorageChangeListener[];
 	/** chrome.runtime.onMessage listeners (an extension page's); tests deliver to them */
 	onMessageListeners: Array<(message: unknown) => void>;
+	/** chrome.runtime.onMessageExternal listeners (a web page's messages) */
+	onMessageExternalListeners: Array<
+		(message: unknown, sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => unknown
+	>;
 	/** chrome.proxy.settings.onChange listeners; fireProxyChange delivers to them */
 	onProxyChangeListeners: Array<(details: ProxySettingChange) => void>;
 	fireProxyChange: () => void;
@@ -153,6 +157,7 @@ export function installChromeMock(): ChromeMock {
 	const onAlarmListeners: Array<(alarm: chrome.alarms.Alarm) => void> = [];
 	const onStorageChangedListeners: StorageChangeListener[] = [];
 	const onMessageListeners: Array<(message: unknown) => void> = [];
+	const onMessageExternalListeners: ChromeMock["onMessageExternalListeners"] = [];
 	const onProxyChangeListeners: Array<(details: ProxySettingChange) => void> = [];
 	const onProxyErrorListeners: Array<(details: { error: string; details: string; fatal: boolean }) => void> = [];
 	const onMessageResponders: ChromeMock["onMessageResponders"] = [];
@@ -249,9 +254,12 @@ export function installChromeMock(): ChromeMock {
 				},
 				hasListener: (listener: (message: unknown) => void) => onMessageListeners.includes(listener),
 			},
-			// the background's external messages; no test delivers to them
+			// external messages from web pages: the background registers none
+			// (tests/external-messages.test.ts delivers to whatever is here)
 			onMessageExternal: {
-				addListener: () => {},
+				addListener: (listener: ChromeMock["onMessageExternalListeners"][number]) => {
+					onMessageExternalListeners.push(listener);
+				},
 			},
 		},
 		// the background's legacy sign-in tab listener; no test delivers to it
@@ -270,6 +278,19 @@ export function installChromeMock(): ChromeMock {
 			clear: (name: string) => {
 				alarmClearCalls.push(name);
 				return Promise.resolve(alarms.delete(name));
+			},
+			// the alarm set under `name`, or undefined, as the promise form answers
+			get: (name: string) => {
+				const info = alarms.get(name);
+				return Promise.resolve(
+					info
+						? {
+								name,
+								scheduledTime: info.when ?? Date.now() + (info.delayInMinutes ?? 0) * 60_000,
+								periodInMinutes: info.periodInMinutes,
+							}
+						: undefined,
+				);
 			},
 			onAlarm: {
 				addListener: (listener: (alarm: chrome.alarms.Alarm) => void) => {
@@ -352,6 +373,7 @@ export function installChromeMock(): ChromeMock {
 		onAlarmListeners,
 		onStorageChangedListeners,
 		onMessageListeners,
+		onMessageExternalListeners,
 		onProxyChangeListeners,
 		onProxyErrorListeners,
 		onMessageResponders,

@@ -112,9 +112,6 @@ export default defineManifest({
 			matches: ["<all_urls>"],
 		},
 	],
-	externally_connectable: {
-		matches: ["https://ur.io/*", "https://manager.bringyour.com/*"],
-	},
 	...(isFirefox
 		? {
 			browser_specific_settings: {
