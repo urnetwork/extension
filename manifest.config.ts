@@ -44,7 +44,7 @@ export default defineManifest({
 	// An update that adds a required permission with a warning (notifications
 	// has one) is disabled by the browser until the user accepts it, and the
 	// extension's proxy setting goes with it.
-	permissions: ["proxy", "storage", "alarms", "tabs", "identity"],
+	permissions: ["proxy", "storage", "alarms", "identity"],
 	// The out-of-data notification (utils/out-of-balance.ts): optional, so an
 	// update asks nothing and keeps the extension enabled. Only the popup's Turn
 	// on alerts asks for it, on the user's click (owner, 2026-11-11;

@@ -17,7 +17,7 @@ import {
 } from "../bridge/background";
 import type { ConnectLocation } from "../utils/sdk-types";
 import { initDeviceRpcBridge } from "../bridge/device-rpc";
-import { startSsoFlow, clearSsoState, retrieveAndValidateState } from "../utils/sso";
+import { startSsoFlow } from "../utils/sso";
 import type { FirefoxGlobal } from "../types/firefox-webext";
 import type { CodeSignInAnswer } from "../utils/code-sign-in";
 import { POPUP_CODE_SIGN_IN } from "../utils/own-sign-in";
@@ -141,30 +141,6 @@ if ((globalThis as FirefoxGlobal).browser?.proxy?.onRequest) {
 	setTimeout(restoreThenMigrate, 2_000);
 }
 
-// ── SSO tab listener (legacy fallback for non-identity flows) ───────────────────
-// The main flow now uses chrome.identity.launchWebAuthFlow, which delivers the
-// auth code directly to the extension via a browser-controlled redirect URL.
-// This listener is kept only as a safety net for any legacy/manual tab flow.
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-	const url = changeInfo.url;
-	if (!url || !isSsoCompleteUrlLegacy(url)) return;
-
-	const parsed = parseSsoCompleteUrlLegacy(url);
-	if (!parsed) return;
-
-	(async () => {
-		const valid = await retrieveAndValidateState(parsed.state);
-		if (!valid) {
-			console.warn("SSO state mismatch or expired, ignoring callback");
-			return;
-		}
-
-		await clearSsoState();
-		await completeSsoLogin(parsed.code);
-		chrome.tabs.remove(tabId).catch(() => {});
-	})();
-});
-
 // SSO's page hands back a sign-in code, which signs the extension in with a
 // session of its own, as the popup's code entry does (bridge/background.ts
 // signInWithCode: the redemption's request id, the typed refusals, and
@@ -175,33 +151,6 @@ async function completeSsoLogin(code: string): Promise<CodeSignInAnswer> {
 		console.error("SSO code-login failed:", answer.code ?? answer.error);
 	}
 	return answer;
-}
-
-function isSsoCompleteUrlLegacy(url: string): boolean {
-	try {
-		const parsed = new URL(url);
-		return (
-			parsed.protocol === "https:" &&
-			parsed.hostname === "manager.bringyour.com" &&
-			parsed.pathname === "/login-extension/complete"
-		);
-	} catch {
-		return false;
-	}
-}
-
-function parseSsoCompleteUrlLegacy(url: string): { code: string; state: string } | null {
-	try {
-		const parsed = new URL(url);
-		const hash = parsed.hash.startsWith("#") ? parsed.hash.slice(1) : parsed.hash;
-		const hashParams = new URLSearchParams(hash);
-		const code = hashParams.get("code");
-		const state = hashParams.get("state");
-		if (!code || !state) return null;
-		return { code, state };
-	} catch {
-		return null;
-	}
 }
 
 // ── Internal SSO handler ─────────────────────────────────────────────────────
