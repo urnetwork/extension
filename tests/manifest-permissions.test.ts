@@ -12,8 +12,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // the plugin's defineManifest returns the manifest it is given
 vi.mock("@crxjs/vite-plugin", () => ({ defineManifest: (manifest: unknown) => manifest }));
 
-// the required permissions of the store releases (v2026.10.30-1086064830)
-const REQUIRED = ["proxy", "storage", "alarms", "tabs", "identity"];
+// the required permissions of the store releases (v2026.10.30-1086064830),
+// less "tabs" (owner decision 2026-11-27: only a legacy SSO tab listener used
+// it; sign-in goes through chrome.identity.launchWebAuthFlow)
+const REQUIRED = ["proxy", "storage", "alarms", "identity"];
 
 type Permissions = { permissions?: string[]; optional_permissions?: string[] };
 
@@ -36,6 +38,13 @@ describe("the manifest's permissions", () => {
 			expect(manifest.permissions).toEqual(REQUIRED);
 			expect(manifest.permissions).not.toContain("notifications");
 			expect(manifest.optional_permissions).toEqual(["notifications"]);
+		});
+
+		it(`${target}: "tabs" is requested neither as required nor as optional`, async () => {
+			const manifest = await manifestFor(target);
+
+			expect(manifest.permissions).not.toContain("tabs");
+			expect(manifest.optional_permissions ?? []).not.toContain("tabs");
 		});
 	}
 });

@@ -262,12 +262,15 @@ export function installChromeMock(): ChromeMock {
 				},
 			},
 		},
-		// the background's legacy sign-in tab listener; no test delivers to it
-		tabs: {
-			onUpdated: {
-				addListener: () => {},
+		// SSO (utils/sso.ts): a test replaces launchWebAuthFlow to answer with
+		// the redirect URL; by default the flow is dismissed (no URL). There is
+		// no tabs namespace: the manifest does not request "tabs", and nothing
+		// in the extension uses it.
+		identity: {
+			getRedirectURL: (path?: string) => `https://test-extension-id.chromiumapp.org/${path ?? ""}`,
+			launchWebAuthFlow: (_options: unknown, callback?: (responseUrl?: string) => void) => {
+				callback?.(undefined);
 			},
-			remove: () => Promise.resolve(),
 		},
 		alarms: {
 			create: (name: string, info: chrome.alarms.AlarmCreateInfo) => {
