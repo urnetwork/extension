@@ -2,6 +2,8 @@
 // popup about the install's proxy, kept for as long as it holds so that a
 // popup opened later shows what a popup open all along was told
 // (utils/connection-manager.ts reattach):
+// - unanswered: the first check after a connect found no answer in time; the
+//   proxy stays set and the checks go on (checkAfterConnect);
 // - unreachable: the proxy failed its checks and the kill switch keeps it set;
 // - fell_back: the proxy failed its checks and was taken off;
 // - out_of_balance: a check failed because the account has no data left, and
@@ -9,7 +11,7 @@
 //   episode, kept with its plan under STORAGE_KEY_OUT_OF_BALANCE).
 // A passing check, a connect and a disconnect end it. Its own module so the
 // popup and the proxy manager read it without loading the health check.
-export type ProxyHealthReport = "unreachable" | "fell_back" | "out_of_balance";
+export type ProxyHealthReport = "unanswered" | "unreachable" | "fell_back" | "out_of_balance";
 
 // free: the free plan, which the next free grant (00:00 UTC), an upgrade or a
 // data pack ends; pro: a Pro account at its plan's data, which is never
@@ -26,6 +28,11 @@ export type OutOfBalanceEpisode = {
 
 export const STORAGE_KEY_PROXY_HEALTH_REPORT = "proxy_health_report";
 export const STORAGE_KEY_OUT_OF_BALANCE = "proxy_out_of_balance";
+// set while the first check after a connect runs (utils/proxy-health.ts
+// checkAfterConnect), so that a popup opened during it shows Connecting and
+// asks the background for its outcome. Kept after a background that stopped
+// mid-check, whose answer then comes at once; a connect or disconnect ends it.
+export const STORAGE_KEY_PROXY_CONNECT_CHECK = "proxy_connect_check";
 
 /** The report that holds, if any. */
 export async function proxyHealthReport(): Promise<ProxyHealthReport | null> {
@@ -34,7 +41,15 @@ export async function proxyHealthReport(): Promise<ProxyHealthReport | null> {
 }
 
 export function parseReport(value: unknown): ProxyHealthReport | null {
-	return value === "unreachable" || value === "fell_back" || value === "out_of_balance" ? value : null;
+	return value === "unanswered" || value === "unreachable" || value === "fell_back" || value === "out_of_balance"
+		? value
+		: null;
+}
+
+/** Whether the first check after a connect may be running. */
+export async function connectCheckPending(): Promise<boolean> {
+	const result = await chrome.storage.local.get(STORAGE_KEY_PROXY_CONNECT_CHECK);
+	return result[STORAGE_KEY_PROXY_CONNECT_CHECK] === true;
 }
 
 export function parsePlan(value: unknown): OutOfBalancePlan | null {

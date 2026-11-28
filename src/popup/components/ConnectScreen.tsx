@@ -67,6 +67,7 @@ export const ConnectScreen: React.FC = () => {
 		error: connectionError,
 		outOfBalance,
 		blocked,
+		degraded,
 		connect,
 		disconnect,
 		endSession,
@@ -347,7 +348,11 @@ export const ConnectScreen: React.FC = () => {
 					// no receiver / delegation failed — fall through to reconnect
 				}
 			}
-			if ((await handleConnect(location ?? undefined)) === "kept") {
+			// kept: the connect failed with the previous proxy still set; skipped:
+			// another connect was in progress (Connecting lasts until its first
+			// check ends), so this pick never applied
+			const result = await handleConnect(location ?? undefined);
+			if (result === "kept" || result === "skipped") {
 				await showLocation(previous);
 			}
 		},
@@ -407,9 +412,13 @@ export const ConnectScreen: React.FC = () => {
 
 	const isLoading = status === "loading";
 	const isActive = status === "connected";
+	// until the first health check after a connect ends (utils/proxy-health.ts
+	// checkAfterConnect)
 	const isConnecting = status === "connecting";
-	// the kill switch keeps a proxy that does not answer; nothing reconnects
-	// (utils/proxy-health.ts), so the popup says why the browser is offline
+	// a proxy that is set and does not answer: the first check after a connect
+	// found no answer in time, or the kill switch keeps it after the checks gave
+	// up; nothing reconnects (utils/proxy-health.ts), so the popup says why the
+	// browser is offline
 	const isDegraded = status === "degraded";
 	// out of data the proxy stays set whatever the kill switch says
 	// (utils/out-of-balance.ts); Disconnect is the user's
@@ -526,7 +535,11 @@ export const ConnectScreen: React.FC = () => {
 
 					{isDegraded && (
 						<p className="mt-2 text-xs" style={{ color: "var(--ur-color-yellow-light)" }}>
-							{getMessage("extension_proxy_unreachable_kill_switch")}
+							{getMessage(
+								degraded === "unanswered"
+									? "extension_proxy_active_network_unreachable"
+									: "extension_proxy_unreachable_kill_switch",
+							)}
 						</p>
 					)}
 

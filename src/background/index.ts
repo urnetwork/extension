@@ -1,5 +1,11 @@
 import { proxyManager } from "../utils/proxy-manager";
-import { requestHealthCheck, type ProxyHealthTrigger } from "../utils/proxy-health";
+import {
+	checkAfterConnect,
+	connectCheckOutcome,
+	requestHealthCheck,
+	type ProxyHealthOutcome,
+	type ProxyHealthTrigger,
+} from "../utils/proxy-health";
 import { concernsNotifications } from "../utils/alerts-permission";
 import { getKillSwitch } from "../utils/kill-switch";
 import { applyKillSwitchSetting } from "../utils/kill-switch-apply";
@@ -111,6 +117,17 @@ function thrownFailure(err: unknown): Promise<Record<string, unknown>> {
 	return popupFailure(failure?.message, failure?.code);
 }
 
+// The end of the first check after a connect, as the popup shows it
+// (utils/connection-manager.ts): its outcome, null when none ran or it failed,
+// and the proxy as it stands then.
+async function connectCheckAnswer(health: Promise<ProxyHealthOutcome | null>): Promise<Record<string, unknown>> {
+	const outcome = await health.catch((err) => {
+		console.error("Health check (connect) failed:", err);
+		return null;
+	});
+	return { health: outcome, view: await proxyViewForPopup().catch(() => undefined) };
+}
+
 // ── Startup ───────────────────────────────────────────────────────────────────
 
 // Restore the saved proxy, then replace an older version's multi-IP pool with
@@ -210,11 +227,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 				? (message.location as ConnectLocation)
 				: undefined;
 		// a failure answers with the proxy as it stands: a location change that
-		// failed can leave the install's previous proxy set
+		// failed can leave the install's previous proxy set. A connect answers
+		// once its first check ends, and the popup shows Connecting until then
+		// (utils/proxy-health.ts checkAfterConnect, extension#27).
 		connectFromPopup(location)
-			.then((outcome) =>
+			.then(async (outcome) =>
 				outcome.ok
-					? { success: true, session: outcome.session }
+					? {
+							success: true,
+							session: outcome.session,
+							...(await connectCheckAnswer(checkAfterConnect(notifySessionChanged))),
+						}
 					: popupFailure(outcome.error, outcome.code),
 			)
 			.catch((err: Error) => {
@@ -237,6 +260,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 				console.error("Failed to disconnect:", err);
 				return thrownFailure(err);
 			})
+			.then(sendResponse);
+		return true;
+	}
+
+	// A popup that opened while the first check after a connect runs shows
+	// Connecting, and waits here for its end (utils/connection-manager.ts
+	// reattach); with none running it is answered at once.
+	if (message.type === "POPUP_CONNECT_CHECK") {
+		connectCheckAnswer(connectCheckOutcome())
+			.then((answer) => ({ success: true, ...answer }))
 			.then(sendResponse);
 		return true;
 	}

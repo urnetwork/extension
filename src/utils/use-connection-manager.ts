@@ -4,6 +4,7 @@ import {
 	type BlockedProxy,
 	type ConnectResult,
 	type ConnectionStatus,
+	type DegradedCause,
 	type OutOfBalanceAlert,
 } from "./connection-manager";
 import type { ProxyView } from "./proxy-control";
@@ -17,6 +18,8 @@ interface UseConnectionManagerResult {
 	outOfBalance: OutOfBalanceAlert | null;
 	// who keeps the proxy setting from the extension
 	blocked: BlockedProxy | null;
+	// why the proxy is degraded, while it is
+	degraded: DegradedCause | null;
 	connect: (location?: ConnectLocation) => Promise<ConnectResult>;
 	disconnect: () => Promise<void>;
 	// logout: also removes the install's hosted proxy client
@@ -32,6 +35,7 @@ export function useConnectionManager(): UseConnectionManagerResult {
 	const [error, setError] = useState<string | null>(null);
 	const [outOfBalance, setOutOfBalance] = useState<OutOfBalanceAlert | null>(null);
 	const [blocked, setBlocked] = useState<BlockedProxy | null>(null);
+	const [degraded, setDegraded] = useState<DegradedCause | null>(null);
 
 	const proxyChangeCbRef = useRef<((config: null) => void) | null>(null);
 	const managerRef = useRef<ConnectionManager | null>(null);
@@ -49,6 +53,7 @@ export function useConnectionManager(): UseConnectionManagerResult {
 				onError: setError,
 				onOutOfBalance: setOutOfBalance,
 				onBlocked: setBlocked,
+				onDegraded: setDegraded,
 			});
 		}
 		return managerRef.current;
@@ -67,6 +72,7 @@ export function useConnectionManager(): UseConnectionManagerResult {
 			const mgr = getManager();
 			setOutOfBalance(null);
 			setBlocked(null);
+			setDegraded(null);
 			return mgr.connect(location);
 		},
 		[getManager],
@@ -97,5 +103,16 @@ export function useConnectionManager(): UseConnectionManagerResult {
 		[],
 	);
 
-	return { status, error, outOfBalance, blocked, connect, disconnect, endSession, reattach, onProxyChange };
+	return {
+		status,
+		error,
+		outOfBalance,
+		blocked,
+		degraded,
+		connect,
+		disconnect,
+		endSession,
+		reattach,
+		onProxyChange,
+	};
 }
