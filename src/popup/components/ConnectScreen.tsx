@@ -18,7 +18,7 @@ import {
 } from "@urnetwork/elements/react";
 import { useAuth } from "@urnetwork/sdk/react";
 import { useNavigate } from "react-router-dom";
-import { getMessage } from "@/utils/i18n";
+import { getMessage, locationDisplayName } from "@/utils/i18n";
 import type { ConnectLocation } from "@/utils/sdk-types";
 import { chromeStorageAdapter } from "@/utils/storage-adapter";
 import { fetchIpInfo, type IpInfo } from "@/utils/ip-info";
@@ -493,7 +493,7 @@ export const ConnectScreen: React.FC = () => {
 							<UrSelectedLocation
 								key={locationKey(selectedLocation)}
 								locationKey={locationKey(selectedLocation)}
-								name={selectedLocation.name}
+								name={locationDisplayName(selectedLocation)}
 								providerCount={selectedLocation.provider_count}
 								strongPrivacy={selectedLocation.strong_privacy}
 								unstable={!selectedLocation.stable}
@@ -711,7 +711,7 @@ export const ConnectScreen: React.FC = () => {
 									<UrLocationListItem
 										key={listKey(location)}
 										locationKey={locationKey(location)}
-										name={location.name}
+										name={locationDisplayName(location)}
 										providerCount={location.provider_count}
 										onClick={() => selectLocation(location)}
 										strongPrivacy={location.strong_privacy}
@@ -727,7 +727,7 @@ export const ConnectScreen: React.FC = () => {
 									<UrLocationListItem
 										key={listKey(location)}
 										locationKey={locationKey(location)}
-										name={location.name}
+										name={locationDisplayName(location)}
 										providerCount={location.provider_count}
 										onClick={() => selectLocation(location)}
 										strongPrivacy={location.strong_privacy}
@@ -752,7 +752,7 @@ export const ConnectScreen: React.FC = () => {
 									<UrLocationListItem
 										key={listKey(location)}
 										locationKey={locationKey(location)}
-										name={location.name}
+										name={locationDisplayName(location)}
 										providerCount={location.provider_count}
 										onClick={() => selectLocation(location)}
 										strongPrivacy={location.strong_privacy}
@@ -768,7 +768,7 @@ export const ConnectScreen: React.FC = () => {
 									<UrLocationListItem
 										key={listKey(location)}
 										locationKey={locationKey(location)}
-										name={location.name}
+										name={locationDisplayName(location)}
 										providerCount={location.provider_count}
 										onClick={() => selectLocation(location)}
 										strongPrivacy={location.strong_privacy}
@@ -784,7 +784,7 @@ export const ConnectScreen: React.FC = () => {
 									<UrLocationListItem
 										key={listKey(location)}
 										locationKey={locationKey(location)}
-										name={location.name}
+										name={locationDisplayName(location)}
 										providerCount={location.provider_count}
 										onClick={() => selectLocation(location)}
 										strongPrivacy={location.strong_privacy}

@@ -54,6 +54,7 @@ const EXTENSION_LOCALE = {
 	// Chrome has no es_MX: Mexico's Chrome reads es_419, and Firefox es-MX falls
 	// back to es
 	"es-MX": null,
+	fa: "fa",
 	fr: "fr",
 	he: "he",
 	hi: "hi",
@@ -71,6 +72,7 @@ const EXTENSION_LOCALE = {
 	sv: "sv",
 	sw: "sw",
 	th: "th",
+	tr: "tr",
 	uk: "uk",
 	vi: "vi",
 	// the store's zh is Simplified Chinese

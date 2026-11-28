@@ -40,6 +40,8 @@ describe("the extension's locale folders", () => {
 
 	it("carry the store's regional variants under the codes the browsers load", () => {
 		expect(folders()).toEqual(expect.arrayContaining(["pt_BR", "pt_PT", "es_419", "zh_CN", "zh_TW"]));
+		// Turkish and Persian, which Chrome lists as tr and fa
+		expect(folders()).toEqual(expect.arrayContaining(["tr", "fa"]));
 		// the store's zh is Simplified Chinese, its zh-HK Traditional
 		expect(catalog("zh_CN").connect?.message).toBe("连接");
 		expect(catalog("zh_TW").disconnect?.message).toMatch(/[斷連]/);
