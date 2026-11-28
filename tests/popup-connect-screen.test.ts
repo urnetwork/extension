@@ -37,6 +37,7 @@ import { installChromeMock, message, type ChromeMock } from "./chrome-mock";
 import type {
 	BlockedProxy,
 	ConnectionStatus,
+	DegradedCause,
 	OutOfBalanceAlert,
 } from "../src/utils/connection-manager";
 import type { AlertsPermission } from "../src/utils/use-alerts-permission";
@@ -50,7 +51,8 @@ const connection: {
 	error: string | null;
 	outOfBalance: OutOfBalanceAlert | null;
 	blocked: BlockedProxy | null;
-} = { status: "idle", error: null, outOfBalance: null, blocked: null };
+	degraded: DegradedCause | null;
+} = { status: "idle", error: null, outOfBalance: null, blocked: null, degraded: null };
 
 vi.mock("@/utils/use-connection-manager", () => ({
 	useConnectionManager: () => ({
@@ -58,6 +60,7 @@ vi.mock("@/utils/use-connection-manager", () => ({
 		error: connection.error,
 		outOfBalance: connection.outOfBalance,
 		blocked: connection.blocked,
+		degraded: connection.degraded,
 		connect: async () => "connected",
 		disconnect: async () => {},
 		endSession: async () => {},
@@ -96,6 +99,7 @@ beforeEach(() => {
 	connection.error = null;
 	connection.outOfBalance = null;
 	connection.blocked = null;
+	connection.degraded = null;
 	alerts.permission = "unread";
 });
 
@@ -144,6 +148,7 @@ const TURN_ON_ALERTS_ROW = 'data-testid="turn-on-alerts-row"';
 describe("popup connect screen", () => {
 	it("the kill switch's degraded state shows why, and no reconnect", () => {
 		connection.status = "degraded";
+		connection.degraded = "kill_switch";
 
 		const html = render();
 
@@ -152,6 +157,30 @@ describe("popup connect screen", () => {
 		expect(html).not.toContain("Reconnecting");
 		// the browser is still set to the proxy: disconnecting is how to leave it
 		expect(buttons(html)).toContain("Disconnect");
+	});
+
+	// extension#27: the first check after a connect found no answer in time;
+	// the kill switch has decided nothing yet, so its note would be wrong
+	it("degraded after a connect's first check: the proxy is set and traffic does not get through", () => {
+		connection.status = "degraded";
+		connection.degraded = "unanswered";
+
+		const html = render();
+
+		expect(html).toContain("Proxy active but network unreachable.");
+		expect(html).not.toContain("The kill switch keeps the browser offline");
+		expect(statusLine(html)).toBe("Proxy not answering");
+		expect(buttons(html)).toContain("Disconnect");
+	});
+
+	it("connecting: Connecting… and Disconnect, until the connect's first check ends", () => {
+		connection.status = "connecting";
+
+		const html = render();
+
+		expect(statusLine(html)).toBe("Connecting…");
+		expect(buttons(html)).toContain("Disconnect");
+		expect(buttons(html)).not.toContain("Connect");
 	});
 
 	it("a refused connect shows the server's reason, with Retry", () => {

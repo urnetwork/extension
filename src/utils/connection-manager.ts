@@ -11,9 +11,17 @@
 // The popup opens loading, showing no state until the background answers
 // (reattach): never Disconnected or Connect over a proxy that may be set.
 //
+// A connect shows Connecting until the first health check after it ends
+// (extension#27): a proxy that is set may not carry traffic yet. The
+// background answers the connect once that check passed (Connected), or found
+// no answer in time (Degraded), or found the account out of data. A popup
+// that opens while the check runs shows Connecting, and waits for the same
+// end (POPUP_CONNECT_CHECK).
+//
 // Not safe for concurrent use: the popup drives one instance at a time.
 import { getMessage } from "./i18n";
 import {
+	connectCheckPending,
 	proxyHealthReportWithPlan,
 	parsePlan,
 	type OutOfBalancePlan,
@@ -29,8 +37,12 @@ import {
 import type { ConnectLocation } from "./sdk-types";
 
 // - loading: the popup opened and the background has not said yet;
-// - degraded: the proxy is set, failed its health checks, and the kill switch
-//   keeps it set, so the browser is offline until it answers or a disconnect;
+// - connecting: a connect is in progress, until the first health check after
+//   it ends;
+// - degraded: the proxy is set and does not answer, so the browser is offline
+//   until it answers or a disconnect: the first check after the connect found
+//   no answer in time and the checks go on, or the checks gave up and the
+//   kill switch keeps it set (DegradedCause);
 // - out_of_balance: the proxy is set and the account has no data left, so the
 //   browser is offline until data is available or a disconnect, whatever the
 //   kill switch says (utils/out-of-balance.ts);
@@ -57,6 +69,11 @@ export type OutOfBalanceAlert = { plan: OutOfBalancePlan; held: boolean };
 // Disconnect ends it).
 export type BlockedProxy = { control: ProxyControlRefusal; intent: boolean };
 
+// Why the proxy is Degraded: the first check after a connect found no answer
+// in time, and the checks go on (unanswered); or the checks gave up and the
+// kill switch keeps the proxy set (kill_switch).
+export type DegradedCause = "unanswered" | "kill_switch";
+
 export interface ConnectionManagerCallbacks {
 	onStatusChange: (status: ConnectionStatus) => void;
 	onProxyChange: (config: null) => void;
@@ -67,6 +84,7 @@ export interface ConnectionManagerCallbacks {
 	onError: (message: string | null) => void;
 	onOutOfBalance?: (alert: OutOfBalanceAlert | null) => void;
 	onBlocked?: (blocked: BlockedProxy | null) => void;
+	onDegraded?: (cause: DegradedCause | null) => void;
 }
 
 // what a connect came to: connected; failed with the install's previous proxy
@@ -77,9 +95,14 @@ export type ConnectResult = "connected" | "kept" | "failed" | "blocked" | "skipp
 // Sends one message to the background and resolves its answer.
 export type BackgroundSendFn = (message: Record<string, unknown>) => Promise<unknown>;
 
+// health: how the first check after a connect ended (utils/proxy-health.ts
+// ProxyHealthOutcome), null when none ran; an older background leaves it out
 type BackgroundAnswer =
-	| { success?: boolean; error?: string; code?: string; view?: Partial<ProxyView> }
+	| { success?: boolean; error?: string; code?: string; view?: Partial<ProxyView>; health?: unknown }
 	| undefined;
+
+// the proxy set by a connect that answered without a view
+const OWN_VIEW: ProxyView = { enabled: true, control: "ours", intent: true };
 
 // the proxy as the background reported it, or null when it could not say
 function parseView(value: unknown): ProxyView | null {
@@ -129,9 +152,11 @@ export class ConnectionManager {
 	// ── public API ─────────────────────────────────────────────────────────────
 
 	// Connects at `location` (best available without one): the background
-	// applies the install's client, or replaces it at a new location. A failure
-	// shows the proxy as the background says it stands: a location change that
-	// failed can leave the previous proxy set, which is still connected.
+	// applies the install's client, or replaces it at a new location, and
+	// answers once the first check after it ends; Connecting until then. A
+	// failure shows the proxy as the background says it stands: a location
+	// change that failed can leave the previous proxy set, which is still
+	// connected.
 	async connect(location?: ConnectLocation): Promise<ConnectResult> {
 		if (this.operationLock || this.destroyed) return "skipped";
 		this.operationLock = true;
@@ -146,7 +171,12 @@ export class ConnectionManager {
 			}
 			if (this.destroyed) return "skipped";
 			if (answer?.success) {
-				this.show("connected");
+				if (answer.health === undefined) {
+					// an older background, which answers before any check
+					this.show("connected");
+				} else {
+					await this.showCheckEnd(answer.health, parseView(answer.view) ?? OWN_VIEW);
+				}
 				this.callbacks.onProxyChange(null);
 				return "connected";
 			}
@@ -189,24 +219,27 @@ export class ConnectionManager {
 	// the proxy as GET_VPN_STATE reports it (a boolean: whether the browser is
 	// set to the proxy), null when the background could not say. A proxy that
 	// is set is Connected, unless the health check's last report is that it does
-	// not answer and the kill switch keeps it set, or that the account is out of
-	// balance; a proxy the check took off shows why; a setting another extension
-	// or policy holds shows that. A popup opened mid-outage waits for no check.
+	// not answer, or that the account is out of balance; a proxy the check took
+	// off shows why; a setting another extension or policy holds shows that. A
+	// popup opened mid-outage waits for no check, but one opened during the
+	// first check after a connect shows Connecting until that check ends.
 	async reattach(view: ProxyView | boolean | null): Promise<void> {
 		if (this.destroyed || this.operationLock || this.reportsDuringReattach) return;
 		const live: unknown[] = [];
 		this.reportsDuringReattach = live;
-		const report = await this.readHeldReport();
+		const [report, checking] = await Promise.all([this.readHeldReport(), this.readConnectCheck()]);
 		this.reportsDuringReattach = null;
 		if (this.destroyed) return;
+		const proxyView: ProxyView | null =
+			typeof view === "boolean" ? { enabled: view, control: view ? "ours" : "available", intent: view } : view;
 		// a connect, or a live report, since the popup opened is newer
 		if (!this.operationLock && this.status === "loading") {
-			this.showView(
-				typeof view === "boolean"
-					? { enabled: view, control: view ? "ours" : "available", intent: view }
-					: view,
-				report,
-			);
+			if (checking && proxyView?.enabled && !isControlRefusal(proxyView.control)) {
+				// the check's end is newer than any report that came meanwhile
+				await this.awaitConnectCheck(proxyView);
+				return;
+			}
+			this.showView(proxyView, report);
 		}
 		for (const message of live) {
 			this.backgroundMessage(message);
@@ -227,6 +260,49 @@ export class ConnectionManager {
 			// unread: the proxy state alone decides
 			return null;
 		}
+	}
+
+	private async readConnectCheck(): Promise<boolean> {
+		try {
+			return await connectCheckPending();
+		} catch {
+			// unread: as if none ran
+			return false;
+		}
+	}
+
+	// Connecting, until the background answers how the first check after a
+	// connect ended (background/index.ts POPUP_CONNECT_CHECK). A background that
+	// cannot be asked leaves `view` and the kept report to decide.
+	private async awaitConnectCheck(view: ProxyView): Promise<void> {
+		this.operationLock = true;
+		this.show("connecting");
+		try {
+			let answer: BackgroundAnswer;
+			try {
+				answer = (await this.send({ type: "POPUP_CONNECT_CHECK" })) as BackgroundAnswer;
+			} catch {
+				answer = undefined;
+			}
+			if (this.destroyed) return;
+			await this.showCheckEnd(answer?.health, parseView(answer?.view) ?? view);
+		} finally {
+			this.operationLock = false;
+		}
+	}
+
+	// How the first check after a connect ended: Connected when a probe passed;
+	// otherwise the proxy as it stands, with the report the check kept: Degraded
+	// while it does not answer yet, the out-of-data alert, or Connected when it
+	// kept none (no check ran).
+	private async showCheckEnd(health: unknown, view: ProxyView): Promise<void> {
+		if (health === "healthy") {
+			this.show("connected");
+			return;
+		}
+		const held = await this.readHeldReport();
+		if (this.destroyed) return;
+		this.showView(view, held ?? (health === "unanswered" ? { report: "unanswered", plan: null } : null));
 	}
 
 	private async end(type: "POPUP_DISCONNECT" | "POPUP_END_SESSION"): Promise<void> {
@@ -264,7 +340,9 @@ export class ConnectionManager {
 		}
 		if (view?.enabled) {
 			if (held?.report === "unreachable") {
-				this.show("degraded");
+				this.showDegraded("kill_switch");
+			} else if (held?.report === "unanswered") {
+				this.showDegraded("unanswered");
 			} else if (held?.report === "out_of_balance") {
 				this.showOutOfBalance(held.plan ?? "free");
 			} else {
@@ -291,6 +369,11 @@ export class ConnectionManager {
 		this.callbacks.onBlocked?.({ control, intent });
 	}
 
+	private showDegraded(cause: DegradedCause): void {
+		this.show("degraded");
+		this.callbacks.onDegraded?.(cause);
+	}
+
 	// sets the status, and ends the alerts that belong to other statuses
 	private show(status: ConnectionStatus): void {
 		if (status !== "out_of_balance") {
@@ -299,6 +382,9 @@ export class ConnectionManager {
 		}
 		if (status !== "blocked" && this.status === "blocked") {
 			this.callbacks.onBlocked?.(null);
+		}
+		if (status !== "degraded" && this.status === "degraded") {
+			this.callbacks.onDegraded?.(null);
 		}
 		this.setStatus(status);
 	}
@@ -329,7 +415,10 @@ export class ConnectionManager {
 			this.show("error");
 			this.callbacks.onError(getMessage("extension_proxy_fell_back"));
 		} else if (outcome === "unreachable") {
-			this.show("degraded");
+			this.showDegraded("kill_switch");
+			this.callbacks.onError(null);
+		} else if (outcome === "unanswered") {
+			this.showDegraded("unanswered");
 			this.callbacks.onError(null);
 		} else if (outcome === "out_of_balance") {
 			this.showOutOfBalance(plan ?? "free");
